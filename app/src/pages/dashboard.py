@@ -2,21 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import src.components as cmpt
 from plotly.subplots import make_subplots
 
 from src.db import db as database, Table, get_db_connection
 
-from src.components import (
-    vertical_spacer,
-    split_row,
-    fema_nri_map,
-    population_by_climate_region,
-    national_risk_score,
-    climate_hazards,
-    socioeconomic_projections,
-    plot_socioeconomic_indices,
-    plot_socioeconomic_radar,
-)
+
 
 def display_scenario_impact_analysis(county_name, state_name, projected_data):
     """
@@ -591,7 +582,7 @@ def display_migration_impact_analysis(projections_dict, scenario):
         (additional_residents / baseline_pop_2065) * 100, 1)
 
     # Display metrics in same row
-    split_row(
+    cmpt.split_row(
         lambda: st.metric(
             label="Estimated Population by 2065",
             value=f"{selected_pop_2065:,}",
@@ -986,9 +977,9 @@ with st.sidebar:
         selected_scenario
     )
     
-    vertical_spacer(5)
+    cmpt.vertical_spacer(5)
 
-    national_risk_score(selected_county_fips)
+    cmpt.plot_nri_score(selected_county_fips)
 
 
 # Short paragraph explaining why climate migration will occur and how
@@ -998,7 +989,7 @@ Climate change is increasingly driving population shifts across the United State
 """)
 
 # Climate migration choropleth of US counties
-fema_nri_map(selected_scenario)
+cmpt.plot_nri_choropleth(selected_scenario)
 
 st.markdown("""
             ### Climate Vulnerability Isn't the Whole Story
@@ -1024,7 +1015,7 @@ feature_cards(
 with st.expander("Read more about migration factors", icon=":material/article:"):
     st.markdown("""When regions experiencing population loss due to climate concerns face labor shortages, wages tend to rise, creating an economic incentive for some people to stay or even move into these areas despite climate risks. Housing prices also adjust, becoming more affordable in areas experiencing outmigration, which further complicates migration patterns. This economic "dampening effect" means that even highly climate-vulnerable counties won't see mass exoduses, as financial considerations, family ties, and community connections often outweigh climate concerns in people's decision-making process. Migration is ultimately a complex interplay of climate, economic, social, and personal factors rather than a simple response to climate vulnerability alone. The key migration decision factors included in this model are:""")
 
-vertical_spacer(5)
+cmpt.vertical_spacer(5)
 
 # Get the County FIPS code, which will be used for all future queries
 if selected_county_fips:
@@ -1038,7 +1029,7 @@ else:
 if selected_county_fips:
     
     
-    population_by_climate_region(selected_scenario)
+    cmpt.population_by_climate_region(selected_scenario)
 
     st.markdown("""
                 These projections help visualize how climate change could reshape population distribution across regions, with some areas experiencing population growth (Northeast, West, California) and others facing decline (South, Midwest) due to climate-related migration pressures.

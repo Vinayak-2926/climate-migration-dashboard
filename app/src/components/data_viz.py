@@ -12,6 +12,15 @@ from src.db import db as database, Table
 from shapely import wkt
 from urllib.request import urlopen
 
+__all__ = [
+    "plot_nri_choropleth",
+    "population_by_climate_region",
+    "plot_nri_score",
+    "plot_climate_hazards",
+    "socioeconomic_projections",
+    "plot_socioeconomic_indices",
+    "plot_socioeconomic_radar",
+]
 
 # Define the color palette globally to avoid duplication
 RISK_COLORS_RGB = [
@@ -40,7 +49,7 @@ def get_risk_color(score, opacity=1.0):
     return f"rgba({r}, {g}, {b}, {opacity})"
 
 
-def national_risk_score(county_fips):
+def plot_nri_score(county_fips):
     fema_df = database.get_stat_var(
         Table.COUNTY_FEMA_DATA, "FEMA_NRI", county_fips, 2023)
 
@@ -90,7 +99,7 @@ def national_risk_score(county_fips):
     st.plotly_chart(fig)
 
 
-def climate_hazards(county_fips, county_name):
+def plot_climate_hazards(county_fips, county_name):
     # Display top hazards
     hazard_data = {
         "Hazard Type": ["Extreme Heat", "Drought", "Riverine Flooding", "Wildfire", "Hurricane"],
@@ -123,7 +132,7 @@ def climate_hazards(county_fips, county_name):
     st.plotly_chart(fig)
 
 
-def fema_nri_map(scenario):
+def plot_nri_choropleth(scenario):
     try:
         # Load county GeoJSON data
         with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:

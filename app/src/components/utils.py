@@ -1,6 +1,11 @@
 from typing import List
 import streamlit as st
 
+__all__ = [
+    "vertical_spacer",
+    "split_row"
+]
+
 def vertical_spacer(n=1):
     """
     Adds vertical space to a Streamlit app using HTML line breaks.
