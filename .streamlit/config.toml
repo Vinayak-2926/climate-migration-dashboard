@@ -1,0 +1,9 @@
+[theme]
+
+font = "Roboto"
+
+headingFont = "Inter"
+
+[theme.sidebar]
+
+backgroundColor = "white"
