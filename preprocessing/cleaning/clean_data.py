@@ -215,32 +215,29 @@ class DataCleaner:
         
         try:
             # Get the xlsx file
-            pop_path = PATHS["raw_data"]["cbsa"] / f"cbsa_counties_data.xls"
+            pop_path = PATHS["raw_data"]["cbsa"] / "cbsa_counties_data.xlsx"
             
             if not pop_path.exists():
-                raise FileNotFoundError(f"Path '{pop_path}' does not exist")
+                print(f"CBSA data file not found at: {pop_path}")
+                return pd.DataFrame()  # Return empty DataFrame instead of raising error
                 
-            cbsa_df = pd.read_excel(pop_path, dtype={'FIPS State Code': str, 'FIPS County Code': str}, header=2)
+            cbsa_df = pd.read_excel(pop_path, dtype={'FIPS State Code': str, 'FIPS County Code': str}, header=0)
             
             cbsa_df["COUNTY_FIPS"] = cbsa_df["FIPS State Code"].str.cat(cbsa_df["FIPS County Code"])
             cbsa_df["YEAR"] = 2023
             cbsa_df = cbsa_df[["COUNTY_FIPS", "CBSA Code", "Metropolitan/Micropolitan Statistical Area", "YEAR"]]
-            
-            # Filter for metropolitan areas only
-            # cbsa_df = cbsa_df[cbsa_df["Metropolitan/Micropolitan Statistical Area"].eq("Metropolitan Statistical Area")]
             
             cbsa_df = cbsa_df.rename(columns={
                 "CBSA Code": "CBSA",
                 "Metropolitan/Micropolitan Statistical Area": "TYPE",
             })
             
-            # cbsa_df = cbsa_df.set_index("COUNTY_FIPS")
-            
             return cbsa_df
-        except Exception as e:
-            print(f"Error loading CBSA data")
-            return e
             
+        except Exception as e:
+            print(f"Error loading CBSA data: {str(e)}")
+            return pd.DataFrame()  # Return empty DataFrame on any error
+                
         
     @classmethod
     def process_job_openings_data(cls) -> pd.DataFrame:
