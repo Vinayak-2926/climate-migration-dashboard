@@ -168,14 +168,15 @@ def plot_nri_choropleth(scenario):
         counties_data = counties_data.merge(
             fema_df, how="inner", on="COUNTY_FIPS")
 
-        # Convert WKT to geometry objects
-        counties_data['geometry'] = counties_data['geometry'].apply(wkt.loads)
-
+        # Convert WKT to geometry objects with error handling
+        counties_data['geometry'] = counties_data['GEOMETRY'].apply(
+            lambda x: wkt.loads(x) if isinstance(x, str) else x)
+        
         # Get centroids of geometries for marker placement
         counties_data['CENTROID_LON'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.x)
+            lambda geom: geom.centroid.x if geom else None)
         counties_data['CENTROID_LAT'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.y)
+            lambda geom: geom.centroid.y if geom else None)
 
         # Calculate variation between scenario and baseline
         counties_data['VARIATION'] = counties_data[scenario] - \
@@ -408,7 +409,7 @@ def population_by_climate_region(scenario):
         )
 
         # Convert WKT to geometry objects
-        counties_data['geometry'] = counties_data['geometry'].apply(wkt.loads)
+        counties_data['geometry'] = counties_data['GEOMETRY'].apply(wkt.loads)
 
         # Get centroids of geometries for marker placement
         counties_data['CENTROID_LON'] = counties_data['geometry'].apply(
