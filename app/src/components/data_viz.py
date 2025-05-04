@@ -48,6 +48,11 @@ RISK_LEVELS = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 # Map risk categories to colors
 RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, RISK_COLORS_RGB_STR))
 
+choropleth_config = {
+    'displayModeBar': False,
+    'scrollZoom': False,
+}
+
 
 def get_risk_color(score, opacity=1.0):
     """Get color for a risk score with specified opacity"""
@@ -181,7 +186,6 @@ def plot_nri_choropleth(scenario):
             ordered=True
         )
 
-
         # Extract the state FIPS from county FIPS (first 2 digits)
         # Ensure it stays as a string
         counties_data['STATE_FIPS'] = counties_data['COUNTY_FIPS'].str[:2]
@@ -242,7 +246,6 @@ def plot_nri_choropleth(scenario):
         # Convert to GeoJSON format for Plotly
         climate_regions_geojson = json.loads(climate_regions_gdf.to_json())
 
-
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
             counties_data,
@@ -279,39 +282,37 @@ def plot_nri_choropleth(scenario):
                 z=[1] * len(climate_regions_gdf),  # Dummy values for coloring
                 # Transparent fill
                 colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']],
-                marker_line_color='white',  # Border color for regions
-                marker_line_width=5,        # Thicker border for visibility
-                showscale=False,            # Hide the colorbar for this layer
+                marker_line_color='white',
+                marker_line_width=5,
+                showscale=False,
                 name="Climate Regions",
                 showlegend=False,
                 hoverinfo='skip'
             )
         )
+
         
-        # *** ADD THIS SECTION to manually create legend entries ***
-        # Iterate through the color mapping dictionary keys to get the desired order
         for label, color in RISK_COLOR_MAPPING.items():
             fig.add_trace(
                 go.Scatter(
-                    x=[None],  # Use None for x and y to prevent displaying points on the map
+                    
+                    x=[None],
                     y=[None],
-                    mode='markers', # Use marker mode to show a colored symbol in the legend
+                    mode='markers',
                     marker=dict(
-                        size=10, # Adjust size as needed for legend marker
-                        color=color # Use the color from your mapping
+                        size=10,
+                        color=color
                     ),
-                    name=label,  # Use the bucket label as the legend item name
+                    name=label,
                     legendgrouptitle=dict(
-                            text='Hazard Risk Level'
-                        ),
-                    legendgroup='manual_nri_legend', # Optional: group these legend items
-                    showlegend=True, # *** Make this dummy trace visible in the legend ***
-                    hoverinfo='none' # Prevent hover tooltips for these dummy traces
+                        text='Hazard Risk Level'
+                    ),
+                    legendgroup='manual_nri_legend',
+                    showlegend=True,
+                    hoverinfo='none'
                 )
             )
-        # *** END OF MANUAL LEGEND SECTION ***
 
-        # Configure the map layout
         fig.update_geos(
             visible=False,
             scope="usa",
@@ -339,7 +340,7 @@ def plot_nri_choropleth(scenario):
             ),
             margin=dict(t=100, b=50, l=50, r=50),
             autosize=True,
-                xaxis=dict(
+            xaxis=dict(
                 visible=False,
                 showgrid=False
             ),
@@ -349,8 +350,11 @@ def plot_nri_choropleth(scenario):
             )
         )
 
-        event = st.plotly_chart(fig, on_select="ignore",
-                                selection_mode=["points"])
+        event = st.plotly_chart(fig,
+                                on_select="ignore",
+                                selection_mode=["points"],
+                                config=choropleth_config
+                                )
 
         return event
     except Exception as e:
@@ -602,7 +606,11 @@ def population_by_climate_region(scenario):
                 opacity=0.8
             )
 
-        event = st.plotly_chart(fig, use_container_width=True)
+        event = st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config=choropleth_config
+        )
 
         return event
     except Exception as e:
@@ -1252,6 +1260,7 @@ def socioeconomic_projections(county_fips):
 
     st.write(indices_df)
 
+
 def generate_policy_recommendations(projected_data):
     """Generate policy recommendations based on the projected data"""
     st.write("# Policy Recommendations")
@@ -1708,4 +1717,3 @@ def display_unemployment_by_education(county_name, state_name, county_fips):
 
     # Display the chart
     st.plotly_chart(fig, use_container_width=True)
-
