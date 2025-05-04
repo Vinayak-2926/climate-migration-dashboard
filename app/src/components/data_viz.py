@@ -121,7 +121,7 @@ def plot_climate_hazards(county_fips, county_name):
         hazards_df['Risk Score'],
         bins=[0, 20, 40, 60, 80, 100],
         labels=RISK_LEVELS,
-        include_lowest=True
+        include_lowest=True,
     )
 
     # Create a horizontal bar chart
@@ -171,37 +171,16 @@ def plot_nri_choropleth(scenario):
         # Convert WKT to geometry objects with error handling
         counties_data['geometry'] = counties_data['GEOMETRY'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
-        
-        # Get centroids of geometries for marker placement
-        counties_data['CENTROID_LON'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.x if geom else None)
-        counties_data['CENTROID_LAT'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.y if geom else None)
-
-        # Calculate variation between scenario and baseline
-        counties_data['VARIATION'] = counties_data[scenario] - \
-            counties_data['POPULATION_2065_S3']
-
-        # Percentage difference
-        counties_data['VARIATION_PCT'] = ((counties_data[scenario] - counties_data['POPULATION_2065_S3']) /
-                                          counties_data['POPULATION_2065_S3']) * 100
-
-        # Apply min-max scaling to normalize population values for marker size
-        min_pop = counties_data[scenario].min()
-        max_pop = counties_data[scenario].max()
-        counties_data['NORMALIZED_POP'] = (
-            counties_data[scenario] - min_pop) / (max_pop - min_pop)
 
         # Create NRI risk buckets
         counties_data['NRI_BUCKET'] = pd.cut(
             counties_data['FEMA_NRI'],
             bins=[0, 20, 40, 60, 80, 100],
-            labels=['Very Low', 'Low', 'Moderate', 'High', 'Very High'],
-            include_lowest=True
+            include_lowest=True,
+            labels=RISK_LEVELS,
+            ordered=True
         )
 
-        # Convert to GeoDataFrame for spatial operations
-        counties_data = gpd.GeoDataFrame(counties_data)
 
         # Extract the state FIPS from county FIPS (first 2 digits)
         # Ensure it stays as a string
@@ -263,37 +242,15 @@ def plot_nri_choropleth(scenario):
         # Convert to GeoJSON format for Plotly
         climate_regions_geojson = json.loads(climate_regions_gdf.to_json())
 
-        # Get MSA counties for additional filtering if needed
-        msa_counties = database.get_cbsa_counties('metro')
-
-        msa_data = counties_data[counties_data['COUNTY_FIPS'].isin(
-            msa_counties['COUNTY_FIPS'])]
-
-        max_abs_variation = max(
-            abs(msa_data['VARIATION_PCT'].min()),
-            abs(msa_data['VARIATION_PCT'].max())
-        )
 
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
             counties_data,
             geojson=counties,
             color='NRI_BUCKET',
-            color_discrete_sequence=[
-                RISK_COLORS_RGBA[3],
-                RISK_COLORS_RGBA[4],
-                RISK_COLORS_RGBA[2],
-                RISK_COLORS_RGBA[1],
-                RISK_COLORS_RGBA[0],
-            ],
+            color_discrete_map=RISK_COLOR_MAPPING,
             locations='COUNTY_FIPS',
             scope="usa",
-            labels={
-                'COUNTY_NAME': 'County',
-                'CLIMATE_REGION': 'Climate Region',
-                'FEMA_NRI': 'National Risk Index',
-                scenario: 'Population'
-            },
             basemap_visible=False,
             hover_data={
                 'COUNTY_NAME': True,
@@ -301,14 +258,15 @@ def plot_nri_choropleth(scenario):
                 'FEMA_NRI': True,
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI']
+            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI'],
         )
 
         # Update hover template to format the display nicely
         fig.update_traces(
+            showlegend=False,
             hovertemplate='<b>%{customdata[0]}</b><br>' +
             'Climate Region: %{customdata[1]}<br>' +
-            'National Risk Index: %{customdata[2]:.1f}<br>' +
+            'FEMA Risk Level: %{customdata[2]:.1f}<br>' +
             '<extra></extra>'  # Removes trace name from hover
         )
 
@@ -329,6 +287,29 @@ def plot_nri_choropleth(scenario):
                 hoverinfo='skip'
             )
         )
+        
+        # *** ADD THIS SECTION to manually create legend entries ***
+        # Iterate through the color mapping dictionary keys to get the desired order
+        for label, color in RISK_COLOR_MAPPING.items():
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],  # Use None for x and y to prevent displaying points on the map
+                    y=[None],
+                    mode='markers', # Use marker mode to show a colored symbol in the legend
+                    marker=dict(
+                        size=10, # Adjust size as needed for legend marker
+                        color=color # Use the color from your mapping
+                    ),
+                    name=label,  # Use the bucket label as the legend item name
+                    legendgrouptitle=dict(
+                            text='Hazard Risk Level'
+                        ),
+                    legendgroup='manual_nri_legend', # Optional: group these legend items
+                    showlegend=True, # *** Make this dummy trace visible in the legend ***
+                    hoverinfo='none' # Prevent hover tooltips for these dummy traces
+                )
+            )
+        # *** END OF MANUAL LEGEND SECTION ***
 
         # Configure the map layout
         fig.update_geos(
@@ -341,7 +322,7 @@ def plot_nri_choropleth(scenario):
         fig.update_layout(
             height=800,
             title=dict(
-                text="County Population Gain w/ FEMA National Risk Index",
+                text="Natural Hazard Risk Index Across Counties",
                 automargin=True,
                 y=0.95  # Adjust vertical position
             ),
@@ -358,6 +339,14 @@ def plot_nri_choropleth(scenario):
             ),
             margin=dict(t=100, b=50, l=50, r=50),
             autosize=True,
+                xaxis=dict(
+                visible=False,
+                showgrid=False
+            ),
+            yaxis=dict(
+                visible=False,
+                showgrid=False
+            )
         )
 
         event = st.plotly_chart(fig, on_select="ignore",
