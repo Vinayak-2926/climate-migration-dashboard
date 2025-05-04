@@ -97,7 +97,7 @@ cmpt.vertical_spacer(5)
 
 # Get the County FIPS code, which will be used for all future queries
 if selected_county_fips:
-    county_metadata = database.get_county_metadata().iloc[0]
+    county_metadata = database.get_county_metadata(selected_county_fips).iloc[0]
     # Separate the county and state names
     full_name = county_metadata['NAME']
     county_name, state_name = full_name.split(', ')
@@ -116,6 +116,8 @@ if selected_county_fips:
 
     projected_data = database.get_table_for_county(
         Table.COUNTY_COMBINED_PROJECTIONS, selected_county_fips)
+
+    cmpt.display_housing_indicators(county_name, state_name, selected_county_fips)
 
     # Display the impact analysis
     cmpt.display_scenario_impact_analysis(

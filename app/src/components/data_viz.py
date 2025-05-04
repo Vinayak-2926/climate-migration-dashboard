@@ -19,6 +19,7 @@ __all__ = [
     "generate_policy_recommendations",
     "display_migration_impact_analysis",
     "display_scenario_impact_analysis",
+    "display_housing_indicators",
     "feature_cards",
     "plot_nri_choropleth",
     "plot_nri_score",
@@ -27,6 +28,8 @@ __all__ = [
     "plot_socioeconomic_radar",
     "population_by_climate_region",
     "socioeconomic_projections",
+    "display_housing_burden_plot",
+    "display_housing_vacancy_plot"
 ]
 
 # Define the color palette globally to avoid duplication
@@ -291,11 +294,10 @@ def plot_nri_choropleth(scenario):
             )
         )
 
-        
         for label, color in RISK_COLOR_MAPPING.items():
             fig.add_trace(
                 go.Scatter(
-                    
+
                     x=[None],
                     y=[None],
                     mode='markers',
@@ -1396,21 +1398,211 @@ def display_population_projections(county_name, state_name, county_fips, populat
 def display_housing_indicators(county_name, state_name, county_fips):
     st.header('Housing Analysis')
 
-    st.write(f"### Median Gross Rent for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "MEDIAN_GROSS_RENT", county_fips=county_fips))
+    split_row(
+        lambda: display_housing_burden_plot(
+            county_name, state_name, county_fips),
+        lambda: display_housing_vacancy_plot(
+            county_name, state_name, county_fips),
+        [0.5, 0.5]
+    )
 
-    st.write(f"### Median House Value for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "MEDIAN_HOUSING_VALUE", county_fips=county_fips))
+    # st.write(f"### Median Gross Rent for {county_name}, {state_name}")
+    # st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
+    #               "MEDIAN_GROSS_RENT", county_fips=county_fips))
 
-    st.write(f"### Total Housing Units for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "TOTAL_HOUSING_UNITS", county_fips=county_fips))
+    # st.write(f"### Median House Value for {county_name}, {state_name}")
+    # st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
+    #               "MEDIAN_HOUSING_VALUE", county_fips=county_fips))
 
-    st.write(f"### Occupied Housing Units for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "OCCUPIED_HOUSING_UNITS", county_fips=county_fips))
+    # st.write(f"### Total Housing Units for {county_name}, {state_name}")
+    # st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
+    #               "TOTAL_HOUSING_UNITS", county_fips=county_fips))
+
+    # st.write(f"### Occupied Housing Units for {county_name}, {state_name}")
+    # st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
+    #               "OCCUPIED_HOUSING_UNITS", county_fips=county_fips))
+
+
+def display_housing_burden_plot(county_name, state_name, county_fips):
+    rent_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="MEDIAN_GROSS_RENT",
+        county_fips=county_fips
+    )
+
+    try:
+        income_df = database.get_stat_var(
+            table=Table.COUNTY_ECONOMIC_DATA,
+            indicator_name="MEDIAN_INCOME",
+            county_fips=county_fips
+        )
+    except AttributeError:
+        st.error("Could not retrieve Median Income data. Please ensure 'COUNTY_ECONOMIC_DATA' table and 'MEDIAN_INCOME' variable exist and are accessible.")
+        return
+    except Exception as e:
+        st.error(f"An error occurred fetching income data: {e}")
+        return
+
+    if rent_df.empty or income_df.empty:
+        st.warning(
+            f"Housing burden data not available for {county_name}, {state_name}.")
+        return
+
+    merged_df = pd.merge(rent_df, income_df, left_index=True,
+                         right_index=True, how='inner')
+
+    if merged_df.empty:
+        st.warning(
+            f"Matching rent and income data by year not available for {county_name}, {state_name}.")
+        return
+
+    # Calculation using the renamed columns
+    merged_df['Median_Rent_Burden_Pct'] = (
+        (merged_df['MEDIAN_GROSS_RENT'] * 12) / merged_df['MEDIAN_INCOME']) * 100
+
+    # Reset index so 'YEAR' becomes a column for Plotly
+    merged_df.reset_index(inplace=True)
+
+    # Convert the 'YEAR' column to datetime
+    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+
+    fig = px.line(
+        merged_df,
+        x='YEAR',  # Use the column name from the index reset
+        y='Median_Rent_Burden_Pct',
+        title=f'Median Rent Burden Over Time'
+    )
+
+    fig.update_layout(
+        xaxis_title='Year',  # Display title can be 'Year'
+        yaxis_title='Median Rent Burden (%)',
+        hovermode='x unified'
+    )
+
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),  # Use the column name
+        x1=merged_df['YEAR'].max(),  # Use the column name
+        y0=30,
+        y1=30,
+        line=dict(color="orange", dash="dash", width=2),
+        name="30% Threshold"
+    )
+
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),  # Use the column name
+        x1=merged_df['YEAR'].max(),  # Use the column name
+        y0=50,
+        y1=50,
+        line=dict(color="red", dash="dash", width=2),
+        name="50% Threshold"
+    )
+
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        y=30,
+        text="30% Burden",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="orange")
+    )
+
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        y=50,
+        text="50% Burden",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="red")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
+def display_housing_vacancy_plot(county_name, state_name, county_fips):
+    # Use indicator_name and expect column named "TOTAL_HOUSING_UNITS"
+    total_units_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="TOTAL_HOUSING_UNITS",
+        county_fips=county_fips
+    )
+
+    # Use indicator_name and expect column named "OCCUPIED_HOUSING_UNITS"
+    occupied_units_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="OCCUPIED_HOUSING_UNITS",
+        county_fips=county_fips
+    )
+
+    if total_units_df.empty or occupied_units_df.empty:
+        st.warning(
+            f"Housing unit data not available for {county_name}, {state_name}.")
+        return
+
+    # No renaming needed if columns are already named correctly
+    # total_units_df = total_units_df.rename(columns={'Value': 'Total_Units'})
+    # occupied_units_df = occupied_units_df.rename(columns={'Value': 'Occupied_Units'})
+
+    # Merge on index (assumed 'YEAR')
+    merged_df = pd.merge(total_units_df, occupied_units_df,
+                         left_index=True, right_index=True, how='inner')
+
+    if merged_df.empty:
+        st.warning(
+            f"Matching total and occupied housing unit data by year not available for {county_name}, {state_name}.")
+        return
+
+    # Calculate Vacant Units using the direct column names
+    merged_df['Vacant_Units'] = merged_df["TOTAL_HOUSING_UNITS"] - \
+        merged_df["OCCUPIED_HOUSING_UNITS"]
+
+    # Calculate Vacancy Rate Percentage using the direct column name for total
+    merged_df['Vacancy_Rate_Pct'] = (
+        merged_df['Vacant_Units'] / merged_df["TOTAL_HOUSING_UNITS"]) * 100
+    merged_df['Vacancy_Rate_Pct'] = merged_df['Vacancy_Rate_Pct'].replace(
+        [float('inf'), float('-inf')], pd.NA).fillna(0)
+
+    merged_df.reset_index(inplace=True)
+    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+
+    fig = px.line(
+        merged_df,
+        x='YEAR',
+        y='Vacancy_Rate_Pct',
+        title=f'Housing Vacancy Rate Over Time'
+    )
+
+    fig.update_layout(
+        xaxis_title='Year',
+        yaxis_title='Vacancy Rate (%)',
+        hovermode='x unified'
+    )
+
+    healthy_vacancy_threshold = 7
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),
+        x1=merged_df['YEAR'].max(),
+        y0=healthy_vacancy_threshold,
+        y1=healthy_vacancy_threshold,
+        line=dict(color="green", dash="dash", width=2),
+        name=f"{healthy_vacancy_threshold}% Threshold"
+    )
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],
+        y=healthy_vacancy_threshold,
+        text=f"{healthy_vacancy_threshold}% Threshold",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="green")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def display_education_indicators(county_name, state_name, county_fips):
