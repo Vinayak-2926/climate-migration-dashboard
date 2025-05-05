@@ -1,9 +1,5 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import src.components as cmpt
-from plotly.subplots import make_subplots
 
 from src.db import db as database, Table, get_db_connection
 
