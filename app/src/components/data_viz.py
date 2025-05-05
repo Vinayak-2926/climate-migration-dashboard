@@ -877,7 +877,7 @@ def feature_cards(items):
             with st.container():
                 # Show the icon and title
                 if 'icon' in item.keys():
-                    st.markdown(f"### **:material/{item['icon']}:**")
+                    st.markdown(f"## **:material/{item['icon']}:**")
 
                 st.markdown(f"##### **{item['title']}**")
 
