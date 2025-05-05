@@ -22,6 +22,7 @@ __all__ = [
     "display_housing_indicators",
     "display_economic_indicators",
     "display_education_indicators",
+    "display_county_indicators",
     "feature_cards",
     "plot_nri_choropleth",
     "plot_nri_score",
@@ -799,20 +800,24 @@ def display_migration_impact_analysis(projections_dict, scenario):
     percent_increase = round(
         (additional_residents / baseline_pop_2065) * 100, 1)
 
-    # Display metrics in same row
-    split_row(
-        lambda: st.metric(
-            label="Estimated Population by 2065",
-            value=f"{selected_pop_2065:,}",
-            delta=None if additional_residents == 0 else (
-                f"{additional_residents:,.0f}" if additional_residents > 0 else f"{additional_residents:,.0f}")
-        ),
-        lambda: st.metric(
-            label="Population Increase",
-            value=f"{percent_increase}%",
-        ),
-        [0.5, 0.5]
+    st.metric(
+        label="Estimated Population by 2065",
+        value=f"{selected_pop_2065:,}",
+        delta=None if additional_residents == 0 else (
+            f"{additional_residents:,.0f}" if additional_residents > 0 else f"{additional_residents:,.0f}")
     )
+
+    st.metric(
+        label="Population Increase",
+        value=f"{percent_increase}%",
+    ),
+
+    # Display metrics in same row
+    # split_row(
+    #     lambda: ,
+    #     lambda:
+    #     [0.5, 0.5]
+    # )
 
 
 def feature_cards(items):
@@ -2129,3 +2134,100 @@ def display_unemployment_by_education(county_name, state_name, county_fips):
 
     # Display the chart
     st.plotly_chart(fig, use_container_width=True)
+
+
+def display_county_indicators(county_fips, scenario):
+    """
+    Display key county indicators with simple descriptions based on z-scores.
+
+    Args:
+        county_fips (str): FIPS code for the selected county
+    """
+    # Fetch z-scores for the county (replace with your actual data retrieval)
+    scenario_values = database.get_index_projections(county_fips, scenario)
+
+    # indicators_df = indicators_df[indicators_df["COUNTY_FIPS"] == county_fips]
+
+    # Extract z-scores (assuming your database function returns these values)
+    z_student_teacher = scenario_values.get('z_STUDENT_TEACHER_RATIO', 0)
+    z_housing = scenario_values.get('z_AVAILABLE_HOUSING_UNITS', 0)
+    z_unemployment = scenario_values.get('z_UNEMPLOYMENT_RATE', 0)
+
+    st.markdown("### Key Performance Indicators")
+
+    # Function to get description based on z-score
+    def get_description(z_score, is_inverse=False):
+        if is_inverse:
+            # For inverse indicators (lower is better)
+            if z_score < -1.5:
+                return "Excellent"
+            elif z_score < -0.5:
+                return "Good"
+            elif z_score < 0.5:
+                return "Average"
+            elif z_score < 1.5:
+                return "Below Average"
+            else:
+                return "Poor"
+        else:
+            # For regular indicators (higher is better)
+            if z_score > 1.5:
+                return "Excellent"
+            elif z_score > 0.5:
+                return "Good"
+            elif z_score > -0.5:
+                return "Average"
+            elif z_score > -1.5:
+                return "Below Average"
+            else:
+                return "Poor"
+
+    # Student-Teacher Ratio (lower is better)
+    if z_student_teacher:
+        st.metric(
+            label="Education",
+            value=get_description(z_student_teacher, is_inverse=True),
+            delta=f"{z_student_teacher:.1f}σ",
+            delta_color="inverse"
+        )
+    else:
+        st.metric(
+            label="Education",
+            value="N/A"
+        )
+
+    # Housing Availability (higher is better)
+    if z_housing:
+        st.metric(
+            label="Housing",
+            value=get_description(z_housing),
+            delta=f"{z_housing:.1f}σ",
+            delta_color="normal"
+        )
+    else:
+        st.metric(
+            label="Housing",
+            value="N/A"
+        )
+
+    # Unemployment Rate (lower is better)
+    if z_unemployment:
+        st.metric(
+            label="Labor",
+            value=get_description(z_unemployment, is_inverse=True),
+            delta=f"{z_unemployment:.1f}σ",
+            delta_color="inverse"
+        )
+    else:
+        st.metric(
+            label="Labor",
+            value="N/A"
+        )
+
+    vertical_spacer(1)
+
+    # Optional: Add small explainer
+    with st.expander("About these indicators"):
+        st.caption(
+            "Values show how this county compares to the national average.")
+        st.caption("σ represents standard deviations from the mean.")
