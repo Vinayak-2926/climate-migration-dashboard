@@ -37,12 +37,13 @@ __all__ = [
 
 # Define the color palette globally to avoid duplication
 RISK_COLORS_RGB = [
-    (77, 109, 189),  # 4D6DBD - Range 0-20
-    (80, 155, 199),  # 509BC7 - Range 20-40
-    (240, 213, 93),  # F0D55D - Range 40-60
-    (224, 112, 105),  # E07069 - Range 60-80
-    (199, 68, 93),  # C7445D - Range 80-100
+    (0, 196, 218),
+    (134, 210, 222),
+    (231, 214, 189),
+    (214, 103, 103),
+    (209, 55, 52),
 ]
+
 
 # Generate color formats once
 RISK_COLORS_RGBA = [f"rgba({r}, {g}, {b}, 1)" for r, g, b in RISK_COLORS_RGB]
