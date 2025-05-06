@@ -49,15 +49,21 @@ with st.sidebar:
         format_func=lambda sel: scenario_names.get(sel),
         index=0
     )
+    
+    cmpt.vertical_spacer(2)
 
     cmpt.display_migration_impact_analysis(
         population_projections.loc[selected_county_fips],
         selected_scenario
     )
 
-    cmpt.vertical_spacer(5)
+    cmpt.vertical_spacer(2)
 
-    cmpt.plot_nri_score(selected_county_fips)
+    cmpt.display_county_indicators(selected_county_fips, selected_scenario)
+
+    # cmpt.vertical_spacer(2)
+
+    # cmpt.plot_nri_score(selected_county_fips)
 
 
 # Short paragraph explaining why climate migration will occur and how
@@ -97,7 +103,8 @@ cmpt.vertical_spacer(5)
 
 # Get the County FIPS code, which will be used for all future queries
 if selected_county_fips:
-    county_metadata = database.get_county_metadata().iloc[0]
+    county_metadata = database.get_county_metadata(
+        selected_county_fips).iloc[0]
     # Separate the county and state names
     full_name = county_metadata['NAME']
     county_name, state_name = full_name.split(', ')
@@ -116,6 +123,13 @@ if selected_county_fips:
 
     projected_data = database.get_table_for_county(
         Table.COUNTY_COMBINED_PROJECTIONS, selected_county_fips)
+
+    cmpt.display_housing_indicators(
+        county_name, state_name, selected_county_fips)
+    
+    cmpt.display_economic_indicators(county_name, state_name, selected_county_fips)
+
+    cmpt.display_education_indicators(county_name, state_name, selected_county_fips)
 
     # Display the impact analysis
     cmpt.display_scenario_impact_analysis(

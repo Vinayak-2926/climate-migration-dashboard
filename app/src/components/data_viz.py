@@ -19,6 +19,10 @@ __all__ = [
     "generate_policy_recommendations",
     "display_migration_impact_analysis",
     "display_scenario_impact_analysis",
+    "display_housing_indicators",
+    "display_economic_indicators",
+    "display_education_indicators",
+    "display_county_indicators",
     "feature_cards",
     "plot_nri_choropleth",
     "plot_nri_score",
@@ -27,16 +31,19 @@ __all__ = [
     "plot_socioeconomic_radar",
     "population_by_climate_region",
     "socioeconomic_projections",
+    "display_housing_burden_plot",
+    "display_housing_vacancy_plot"
 ]
 
 # Define the color palette globally to avoid duplication
 RISK_COLORS_RGB = [
-    (77, 109, 189),  # 4D6DBD - Range 0-20
-    (80, 155, 199),  # 509BC7 - Range 20-40
-    (240, 213, 93),  # F0D55D - Range 40-60
-    (224, 112, 105),  # E07069 - Range 60-80
-    (199, 68, 93),  # C7445D - Range 80-100
+    (0, 196, 218),
+    (134, 210, 222),
+    (231, 214, 189),
+    (214, 103, 103),
+    (209, 55, 52),
 ]
+
 
 # Generate color formats once
 RISK_COLORS_RGBA = [f"rgba({r}, {g}, {b}, 1)" for r, g, b in RISK_COLORS_RGB]
@@ -47,6 +54,11 @@ RISK_LEVELS = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 
 # Map risk categories to colors
 RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, RISK_COLORS_RGB_STR))
+
+choropleth_config = {
+    'displayModeBar': False,
+    'scrollZoom': False,
+}
 
 
 def get_risk_color(score, opacity=1.0):
@@ -121,7 +133,7 @@ def plot_climate_hazards(county_fips, county_name):
         hazards_df['Risk Score'],
         bins=[0, 20, 40, 60, 80, 100],
         labels=RISK_LEVELS,
-        include_lowest=True
+        include_lowest=True,
     )
 
     # Create a horizontal bar chart
@@ -171,37 +183,15 @@ def plot_nri_choropleth(scenario):
         # Convert WKT to geometry objects with error handling
         counties_data['geometry'] = counties_data['GEOMETRY'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
-        
-        # Get centroids of geometries for marker placement
-        counties_data['CENTROID_LON'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.x if geom else None)
-        counties_data['CENTROID_LAT'] = counties_data['geometry'].apply(
-            lambda geom: geom.centroid.y if geom else None)
-
-        # Calculate variation between scenario and baseline
-        counties_data['VARIATION'] = counties_data[scenario] - \
-            counties_data['POPULATION_2065_S3']
-
-        # Percentage difference
-        counties_data['VARIATION_PCT'] = ((counties_data[scenario] - counties_data['POPULATION_2065_S3']) /
-                                          counties_data['POPULATION_2065_S3']) * 100
-
-        # Apply min-max scaling to normalize population values for marker size
-        min_pop = counties_data[scenario].min()
-        max_pop = counties_data[scenario].max()
-        counties_data['NORMALIZED_POP'] = (
-            counties_data[scenario] - min_pop) / (max_pop - min_pop)
 
         # Create NRI risk buckets
         counties_data['NRI_BUCKET'] = pd.cut(
             counties_data['FEMA_NRI'],
             bins=[0, 20, 40, 60, 80, 100],
-            labels=['Very Low', 'Low', 'Moderate', 'High', 'Very High'],
-            include_lowest=True
+            include_lowest=True,
+            labels=RISK_LEVELS,
+            ordered=True
         )
-
-        # Convert to GeoDataFrame for spatial operations
-        counties_data = gpd.GeoDataFrame(counties_data)
 
         # Extract the state FIPS from county FIPS (first 2 digits)
         # Ensure it stays as a string
@@ -263,37 +253,14 @@ def plot_nri_choropleth(scenario):
         # Convert to GeoJSON format for Plotly
         climate_regions_geojson = json.loads(climate_regions_gdf.to_json())
 
-        # Get MSA counties for additional filtering if needed
-        msa_counties = database.get_cbsa_counties('metro')
-
-        msa_data = counties_data[counties_data['COUNTY_FIPS'].isin(
-            msa_counties['COUNTY_FIPS'])]
-
-        max_abs_variation = max(
-            abs(msa_data['VARIATION_PCT'].min()),
-            abs(msa_data['VARIATION_PCT'].max())
-        )
-
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
             counties_data,
             geojson=counties,
             color='NRI_BUCKET',
-            color_discrete_sequence=[
-                RISK_COLORS_RGBA[3],
-                RISK_COLORS_RGBA[4],
-                RISK_COLORS_RGBA[2],
-                RISK_COLORS_RGBA[1],
-                RISK_COLORS_RGBA[0],
-            ],
+            color_discrete_map=RISK_COLOR_MAPPING,
             locations='COUNTY_FIPS',
             scope="usa",
-            labels={
-                'COUNTY_NAME': 'County',
-                'CLIMATE_REGION': 'Climate Region',
-                'FEMA_NRI': 'National Risk Index',
-                scenario: 'Population'
-            },
             basemap_visible=False,
             hover_data={
                 'COUNTY_NAME': True,
@@ -301,14 +268,15 @@ def plot_nri_choropleth(scenario):
                 'FEMA_NRI': True,
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI']
+            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI'],
         )
 
         # Update hover template to format the display nicely
         fig.update_traces(
+            showlegend=False,
             hovertemplate='<b>%{customdata[0]}</b><br>' +
             'Climate Region: %{customdata[1]}<br>' +
-            'National Risk Index: %{customdata[2]:.1f}<br>' +
+            'FEMA Risk Level: %{customdata[2]:.1f}<br>' +
             '<extra></extra>'  # Removes trace name from hover
         )
 
@@ -321,16 +289,36 @@ def plot_nri_choropleth(scenario):
                 z=[1] * len(climate_regions_gdf),  # Dummy values for coloring
                 # Transparent fill
                 colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']],
-                marker_line_color='white',  # Border color for regions
-                marker_line_width=5,        # Thicker border for visibility
-                showscale=False,            # Hide the colorbar for this layer
+                marker_line_color='white',
+                marker_line_width=5,
+                showscale=False,
                 name="Climate Regions",
                 showlegend=False,
                 hoverinfo='skip'
             )
         )
 
-        # Configure the map layout
+        for label, color in RISK_COLOR_MAPPING.items():
+            fig.add_trace(
+                go.Scatter(
+
+                    x=[None],
+                    y=[None],
+                    mode='markers',
+                    marker=dict(
+                        size=10,
+                        color=color
+                    ),
+                    name=label,
+                    legendgrouptitle=dict(
+                        text='Hazard Risk Level'
+                    ),
+                    legendgroup='manual_nri_legend',
+                    showlegend=True,
+                    hoverinfo='none'
+                )
+            )
+
         fig.update_geos(
             visible=False,
             scope="usa",
@@ -341,7 +329,7 @@ def plot_nri_choropleth(scenario):
         fig.update_layout(
             height=800,
             title=dict(
-                text="County Population Gain w/ FEMA National Risk Index",
+                text="Natural Hazard Risk Index Across Counties",
                 automargin=True,
                 y=0.95  # Adjust vertical position
             ),
@@ -358,10 +346,21 @@ def plot_nri_choropleth(scenario):
             ),
             margin=dict(t=100, b=50, l=50, r=50),
             autosize=True,
+            xaxis=dict(
+                visible=False,
+                showgrid=False
+            ),
+            yaxis=dict(
+                visible=False,
+                showgrid=False
+            )
         )
 
-        event = st.plotly_chart(fig, on_select="ignore",
-                                selection_mode=["points"])
+        event = st.plotly_chart(fig,
+                                on_select="ignore",
+                                selection_mode=["points"],
+                                config=choropleth_config
+                                )
 
         return event
     except Exception as e:
@@ -613,7 +612,11 @@ def population_by_climate_region(scenario):
                 opacity=0.8
             )
 
-        event = st.plotly_chart(fig, use_container_width=True)
+        event = st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config=choropleth_config
+        )
 
         return event
     except Exception as e:
@@ -798,20 +801,24 @@ def display_migration_impact_analysis(projections_dict, scenario):
     percent_increase = round(
         (additional_residents / baseline_pop_2065) * 100, 1)
 
-    # Display metrics in same row
-    split_row(
-        lambda: st.metric(
-            label="Estimated Population by 2065",
-            value=f"{selected_pop_2065:,}",
-            delta=None if additional_residents == 0 else (
-                f"{additional_residents:,.0f}" if additional_residents > 0 else f"{additional_residents:,.0f}")
-        ),
-        lambda: st.metric(
-            label="Population Increase",
-            value=f"{percent_increase}%",
-        ),
-        [0.5, 0.5]
+    st.metric(
+        label="Estimated Population by 2065",
+        value=f"{selected_pop_2065:,}",
+        delta=None if additional_residents == 0 else (
+            f"{additional_residents:,.0f}" if additional_residents > 0 else f"{additional_residents:,.0f}")
     )
+
+    st.metric(
+        label="Population Increase",
+        value=f"{percent_increase}%",
+    ),
+
+    # Display metrics in same row
+    # split_row(
+    #     lambda: ,
+    #     lambda:
+    #     [0.5, 0.5]
+    # )
 
 
 def feature_cards(items):
@@ -872,7 +879,7 @@ def feature_cards(items):
             with st.container():
                 # Show the icon and title
                 if 'icon' in item.keys():
-                    st.markdown(f"# **:material/{item['icon']}:**")
+                    st.markdown(f"## **:material/{item['icon']}:**")
 
                 st.markdown(f"##### **{item['title']}**")
 
@@ -1374,27 +1381,364 @@ def display_population_projections(county_name, state_name, county_fips, populat
 def display_housing_indicators(county_name, state_name, county_fips):
     st.header('Housing Analysis')
 
-    st.write(f"### Median Gross Rent for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "MEDIAN_GROSS_RENT", county_fips=county_fips))
+    split_row(
+        lambda: display_housing_burden_plot(
+            county_name, state_name, county_fips),
+        lambda: display_housing_vacancy_plot(
+            county_name, state_name, county_fips),
+        [0.5, 0.5]
+    )
 
-    st.write(f"### Median House Value for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "MEDIAN_HOUSING_VALUE", county_fips=county_fips))
 
-    st.write(f"### Total Housing Units for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "TOTAL_HOUSING_UNITS", county_fips=county_fips))
+def display_housing_burden_plot(county_name, state_name, county_fips):
+    rent_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="MEDIAN_GROSS_RENT",
+        county_fips=county_fips
+    )
 
-    st.write(f"### Occupied Housing Units for {county_name}, {state_name}")
-    st.line_chart(database.get_stat_var(Table.COUNTY_HOUSING_DATA,
-                  "OCCUPIED_HOUSING_UNITS", county_fips=county_fips))
+    try:
+        income_df = database.get_stat_var(
+            table=Table.COUNTY_ECONOMIC_DATA,
+            indicator_name="MEDIAN_INCOME",
+            county_fips=county_fips
+        )
+    except AttributeError:
+        st.error("Could not retrieve Median Income data. Please ensure 'COUNTY_ECONOMIC_DATA' table and 'MEDIAN_INCOME' variable exist and are accessible.")
+        return
+    except Exception as e:
+        st.error(f"An error occurred fetching income data: {e}")
+        return
+
+    if rent_df.empty or income_df.empty:
+        st.warning(
+            f"Housing burden data not available for {county_name}, {state_name}.")
+        return
+
+    merged_df = pd.merge(rent_df, income_df, left_index=True,
+                         right_index=True, how='inner')
+
+    if merged_df.empty:
+        st.warning(
+            f"Matching rent and income data by year not available for {county_name}, {state_name}.")
+        return
+
+    # Calculation using the renamed columns
+    merged_df['Median_Rent_Burden_Pct'] = (
+        (merged_df['MEDIAN_GROSS_RENT'] * 12) / merged_df['MEDIAN_INCOME']) * 100
+
+    # Reset index so 'YEAR' becomes a column for Plotly
+    merged_df.reset_index(inplace=True)
+
+    # Convert the 'YEAR' column to datetime
+    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+
+    fig = px.line(
+        merged_df,
+        x='YEAR',  # Use the column name from the index reset
+        y='Median_Rent_Burden_Pct',
+        title=f'Median Rent Burden Over Time'
+    )
+
+    fig.update_layout(
+        xaxis_title='Year',  # Display title can be 'Year'
+        yaxis_title='Median Rent Burden (%)',
+        hovermode='x unified'
+    )
+
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),  # Use the column name
+        x1=merged_df['YEAR'].max(),  # Use the column name
+        y0=30,
+        y1=30,
+        line=dict(color="orange", dash="dash", width=2),
+        name="30% Threshold"
+    )
+
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),  # Use the column name
+        x1=merged_df['YEAR'].max(),  # Use the column name
+        y0=50,
+        y1=50,
+        line=dict(color="red", dash="dash", width=2),
+        name="50% Threshold"
+    )
+
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        y=30,
+        text="30% Burden",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="orange")
+    )
+
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        y=50,
+        text="50% Burden",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="red")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def display_housing_vacancy_plot(county_name, state_name, county_fips):
+    # Use indicator_name and expect column named "TOTAL_HOUSING_UNITS"
+    total_units_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="TOTAL_HOUSING_UNITS",
+        county_fips=county_fips
+    )
+
+    # Use indicator_name and expect column named "OCCUPIED_HOUSING_UNITS"
+    occupied_units_df = database.get_stat_var(
+        table=Table.COUNTY_HOUSING_DATA,
+        indicator_name="OCCUPIED_HOUSING_UNITS",
+        county_fips=county_fips
+    )
+
+    if total_units_df.empty or occupied_units_df.empty:
+        st.warning(
+            f"Housing unit data not available for {county_name}, {state_name}.")
+        return
+
+    # No renaming needed if columns are already named correctly
+    # total_units_df = total_units_df.rename(columns={'Value': 'Total_Units'})
+    # occupied_units_df = occupied_units_df.rename(columns={'Value': 'Occupied_Units'})
+
+    # Merge on index (assumed 'YEAR')
+    merged_df = pd.merge(total_units_df, occupied_units_df,
+                         left_index=True, right_index=True, how='inner')
+
+    if merged_df.empty:
+        st.warning(
+            f"Matching total and occupied housing unit data by year not available for {county_name}, {state_name}.")
+        return
+
+    # Calculate Vacant Units using the direct column names
+    merged_df['Vacant_Units'] = merged_df["TOTAL_HOUSING_UNITS"] - \
+        merged_df["OCCUPIED_HOUSING_UNITS"]
+
+    # Calculate Vacancy Rate Percentage using the direct column name for total
+    merged_df['Vacancy_Rate_Pct'] = (
+        merged_df['Vacant_Units'] / merged_df["TOTAL_HOUSING_UNITS"]) * 100
+    merged_df['Vacancy_Rate_Pct'] = merged_df['Vacancy_Rate_Pct'].replace(
+        [float('inf'), float('-inf')], pd.NA).fillna(0)
+
+    merged_df.reset_index(inplace=True)
+    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+
+    fig = px.line(
+        merged_df,
+        x='YEAR',
+        y='Vacancy_Rate_Pct',
+        title=f'Housing Vacancy Rate Over Time'
+    )
+
+    fig.update_layout(
+        xaxis_title='Year',
+        yaxis_title='Vacancy Rate (%)',
+        hovermode='x unified'
+    )
+
+    healthy_vacancy_threshold = 7
+    fig.add_shape(
+        type="line",
+        x0=merged_df['YEAR'].min(),
+        x1=merged_df['YEAR'].max(),
+        y0=healthy_vacancy_threshold,
+        y1=healthy_vacancy_threshold,
+        line=dict(color="green", dash="dash", width=2),
+        name=f"{healthy_vacancy_threshold}% Threshold"
+    )
+    fig.add_annotation(
+        x=merged_df['YEAR'].iloc[-1],
+        y=healthy_vacancy_threshold,
+        text=f"{healthy_vacancy_threshold}% Threshold",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="green")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def display_economic_indicators(county_name, state_name, county_fips):
+    st.header('Economic Analysis')
+    split_row(
+        lambda: display_unemployment_rate(
+            county_name, state_name, county_fips),
+        lambda: display_labor_participation(
+            county_name, state_name, county_fips),
+        [0.5, 0.5]
+    )
+
+
+def display_unemployment_rate(county_name, state_name, county_fips):
+    unemployment_df = database.get_stat_var(
+        table=Table.COUNTY_ECONOMIC_DATA,
+        indicator_name="UNEMPLOYMENT_RATE",
+        county_fips=county_fips
+    )
+
+    if unemployment_df.empty:
+        st.warning(
+            f"Matching total and occupied housing unit data by year not available for {county_name}, {state_name}.")
+        return
+
+    unemployment_df.reset_index(inplace=True)
+    unemployment_df['YEAR'] = pd.to_datetime(
+        unemployment_df['YEAR'], format='%Y')
+
+    fig = px.line(
+        unemployment_df,
+        x='YEAR',
+        y='UNEMPLOYMENT_RATE',
+        title=f'Unemployment Rate Over Time'
+    )
+
+    fig.update_layout(
+        xaxis_title='Year',
+        yaxis_title='Unemployment Rate (%)',
+        hovermode='x unified',
+        yaxis_range=[0, None]
+    )
+
+    healthy_vacancy_threshold = 4
+    fig.add_shape(
+        type="line",
+        x0=unemployment_df['YEAR'].min(),
+        x1=unemployment_df['YEAR'].max(),
+        y0=healthy_vacancy_threshold,
+        y1=healthy_vacancy_threshold,
+        line=dict(color="green", dash="dash", width=2),
+        name=f"NAIRU Threshold"
+    )
+
+    fig.add_annotation(
+        x=unemployment_df['YEAR'].iloc[-1],
+        y=healthy_vacancy_threshold,
+        text=f"NAIRU Threshold",
+        showarrow=False,
+        yshift=10,
+        xshift=20,
+        font=dict(color="green")
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def display_labor_participation(county_name, state_name, county_fips):
+    # Fetch data from database
+    labor_df = database.get_stat_var(
+        table=Table.COUNTY_ECONOMIC_DATA,
+        indicator_name="TOTAL_LABOR_FORCE",
+        county_fips=county_fips
+    )
+    total_population_df = database.get_stat_var(
+        table=Table.COUNTY_ECONOMIC_DATA,
+        indicator_name="POPULATION",
+        county_fips=county_fips
+    )
+
+    employed_population_df = database.get_stat_var(
+        table=Table.COUNTY_ECONOMIC_DATA,
+        indicator_name="TOTAL_EMPLOYED_POPULATION",
+        county_fips=county_fips
+    )
+
+    # Merge datasets
+    merged_df = pd.merge(labor_df, total_population_df,
+                         left_index=True, right_index=True, how="inner")
+
+    merged_df = pd.merge(merged_df, employed_population_df,
+                         left_index=True, right_index=True, how="inner")
+
+    if merged_df.empty:
+        st.warning(f"Data not found for {county_name}, {state_name}.")
+        return
+
+    # Calculate labor force participation rate
+    merged_df['LABOR_FORCE_PARTICIPATION_RATE'] = (
+        merged_df['TOTAL_LABOR_FORCE'] / merged_df['POPULATION']) * 100
+
+    # Reset index to make YEAR a column
+    merged_df = merged_df.reset_index()
+
+    # Create figure
+    fig = go.Figure()
+
+    # Add total population first (as base layer)
+    fig.add_trace(
+        go.Scatter(
+            x=merged_df['YEAR'],
+            y=merged_df['POPULATION'],
+            fill='tozeroy',
+            mode='lines',
+            name='Total Population',
+            line=dict(color='#b1d2e7', width=1),
+            fillcolor='#b1d2e7'
+        )
+    )
+
+    # Add labor force on top
+    fig.add_trace(
+        go.Scatter(
+            x=merged_df['YEAR'],
+            y=merged_df['TOTAL_LABOR_FORCE'],
+            fill='tozeroy',
+            mode='lines',
+            name='Labor Force',
+            line=dict(color='#E07069', width=2),
+            fillcolor='#E07069'
+        )
+    )
+
+    # Add labor force on top
+    fig.add_trace(
+        go.Scatter(
+            x=merged_df['YEAR'],
+            y=merged_df['TOTAL_EMPLOYED_POPULATION'],
+            fill='tozeroy',
+            mode='lines',
+            name='Employed Population',
+            line=dict(color='#265c7d', width=2),
+            fillcolor='#265c7d'
+        )
+    )
+
+    # Update layout with title and axis labels
+    fig.update_layout(
+        title=f'Labor Force Participation in {county_name}, {state_name}',
+        xaxis_title='Year',
+        yaxis_title='Population',
+        hovermode='x unified',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=0.95,
+            xanchor='center',
+            x=0.5
+        ),
+        margin=dict(l=60, r=60, t=50, b=50)
+    )
+
+    # Display the chart in Streamlit
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def display_education_indicators(county_name, state_name, county_fips):
     st.header('Education Analysis')
 
-    # Retrieve all the educational attainment data needed for the chart
+    # Retrieve all the educational attainment data
     less_than_hs_df = database.get_stat_var(
         Table.COUNTY_EDUCATION_DATA, "LESS_THAN_HIGH_SCHOOL_TOTAL", county_fips=county_fips)
     hs_graduate_df = database.get_stat_var(
@@ -1426,75 +1770,146 @@ def display_education_indicators(county_name, state_name, county_fips):
         final_df["BACHELORS_OR_HIGHER_TOTAL"] / final_df["TOTAL_POPULATION_25_64"]) * 100
 
     # Create a title for the chart
-    st.write(
-        f"### School Attainment Rate vs. Total Workforce in {county_name}, {state_name}")
+    st.write(f"### Educational Attainment in {county_name}, {state_name}")
 
-    # Since Streamlit doesn't natively support dual-axis charts, we'll use Plotly
+    # Create a figure for the stacked area chart
+    fig = go.Figure()
 
-    # Create a figure with secondary y-axis
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    # Define colors for better visualization
+    colors = {
+        "Less than High School": RISK_COLORS_RGBA[3],
+        "High School Graduate": RISK_COLORS_RGBA[2],
+        "Some College": RISK_COLORS_RGBA[1],
+        "Bachelor's or Higher": RISK_COLORS_RGBA[0]
+    }
 
-    # Add traces for educational attainment percentages (left y-axis)
+    # Add traces in reverse order (highest education first) for better stacking visualization
+    # Each educational level is stacked on top of the previous one
+
+    # Bachelor's or Higher (Bottom layer)
     fig.add_trace(
-        go.Scatter(x=final_df["YEAR"], y=final_df["LessThanHighSchool_Perc"],
-                   mode="lines+markers", name="Less than High School (%)",
-                   marker=dict(symbol="circle")),
-        secondary_y=False
+        go.Scatter(
+            x=final_df["YEAR"],
+            y=final_df["BachelorsOrHigher_Perc"],
+            mode="lines",
+            line=dict(width=0.5, color=colors["Bachelor's or Higher"]),
+            fill="tozeroy",
+            fillcolor=colors["Bachelor's or Higher"],
+            name="Bachelor's Degree or Higher",
+            hovertemplate="%{y:.1f}%<extra></extra>"
+        )
     )
 
+    # Some College (Second layer)
+    # We add the percentages to create proper stacking
     fig.add_trace(
-        go.Scatter(x=final_df["YEAR"], y=final_df["HighSchoolGraduate_Perc"],
-                   mode="lines+markers", name="High School Graduate (%)",
-                   marker=dict(symbol="square")),
-        secondary_y=False
+        go.Scatter(
+            x=final_df["YEAR"],
+            y=final_df["BachelorsOrHigher_Perc"] +
+            final_df["SomeCollege_Perc"],
+            mode="lines",
+            line=dict(width=0.5, color=colors["Some College"]),
+            fill="tonexty",
+            fillcolor=colors["Some College"],
+            name="Some College or Associate's Degree",
+            hovertemplate="%{y:.1f}%<extra></extra>"
+        )
     )
 
+    # High School Graduate (Third layer)
     fig.add_trace(
-        go.Scatter(x=final_df["YEAR"], y=final_df["SomeCollege_Perc"],
-                   mode="lines+markers", name="Some College or Associate's Degree (%)",
-                   marker=dict(symbol="triangle-up")),
-        secondary_y=False
+        go.Scatter(
+            x=final_df["YEAR"],
+            y=final_df["BachelorsOrHigher_Perc"] + final_df["SomeCollege_Perc"] +
+            final_df["HighSchoolGraduate_Perc"],
+            mode="lines",
+            line=dict(width=0.5, color=colors["High School Graduate"]),
+            fill="tonexty",
+            fillcolor=colors["High School Graduate"],
+            name="High School Graduate",
+            hovertemplate="%{y:.1f}%<extra></extra>"
+        )
     )
 
+    # Less than High School (Top layer)
+    # This should add up to 100%
     fig.add_trace(
-        go.Scatter(x=final_df["YEAR"], y=final_df["BachelorsOrHigher_Perc"],
-                   mode="lines+markers", name="Bachelor's Degree or Higher (%)",
-                   marker=dict(symbol="diamond")),
-        secondary_y=False
+        go.Scatter(
+            x=final_df["YEAR"],
+            y=final_df["BachelorsOrHigher_Perc"] + final_df["SomeCollege_Perc"] +
+            final_df["HighSchoolGraduate_Perc"] +
+            final_df["LessThanHighSchool_Perc"],
+            mode="lines",
+            line=dict(width=0.5, color=colors["Less than High School"]),
+            fill="tonexty",
+            fillcolor=colors["Less than High School"],
+            name="Less than High School",
+            hovertemplate="%{y:.1f}%<extra></extra>"
+        )
     )
 
-    # Add trace for total population (right y-axis)
-    fig.add_trace(
-        go.Scatter(x=final_df["YEAR"], y=final_df["TOTAL_POPULATION_25_64"],
-                   mode="lines+markers", name="Total Population (25-64)",
-                   line=dict(dash="dash", color="black"),
-                   marker=dict(symbol="star", color="black")),
-        secondary_y=True
-    )
-
-    # Set axis titles
-    fig.update_xaxes(title_text="YEAR")
-    fig.update_yaxes(
-        title_text="Percentage of Population (25-64)", secondary_y=False)
-    fig.update_yaxes(title_text="Total Population (25-64)", secondary_y=True)
-
+    # Update layout
     fig.update_layout(
-        xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
-        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
-        legend=dict(
-            orientation="h",  # Horizontal legend
-            yanchor="bottom",
-            y=-0.3,  # Position below the plot
-            xanchor="center",
-            x=0.5    # Center the legend horizontally
+        xaxis=dict(
+            title="Year",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='rgba(0,0,0,0.1)'
         ),
-        # Increased bottom margin to accommodate legend
+        yaxis=dict(
+            title="Percentage of Population (25-64)",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='rgba(0,0,0,0.1)',
+            range=[0, 100],  # Fix the y-axis range from 0 to 100%
+            ticksuffix="%"
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.25,
+            xanchor="center",
+            x=0.5
+        ),
         margin=dict(l=40, r=40, t=40, b=100),
         autosize=True,
+        hovermode="x unified"
     )
 
     # Display the chart
     st.plotly_chart(fig, use_container_width=True)
+
+    # Optional: Add a note about the data
+    st.caption(
+        "Note: Data represents educational attainment for the population aged 25-64.")
+
+    # Display the latest year's data in a table format
+    latest_year = final_df["YEAR"].max()
+    latest_data = final_df[final_df["YEAR"] == latest_year].iloc[0]
+
+    st.write(f"### Latest Educational Attainment ({latest_year})")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric(
+            "Less than High School",
+            f"{latest_data['LessThanHighSchool_Perc']:.1f}%"
+        )
+        st.metric(
+            "High School Graduate",
+            f"{latest_data['HighSchoolGraduate_Perc']:.1f}%"
+        )
+
+    with col2:
+        st.metric(
+            "Some College or Associate's",
+            f"{latest_data['SomeCollege_Perc']:.1f}%"
+        )
+        st.metric(
+            "Bachelor's or Higher",
+            f"{latest_data['BachelorsOrHigher_Perc']:.1f}%"
+        )
 
 
 def display_unemployment_indicators(county_name, state_name, county_fips):
@@ -1695,3 +2110,100 @@ def display_unemployment_by_education(county_name, state_name, county_fips):
 
     # Display the chart
     st.plotly_chart(fig, use_container_width=True)
+
+
+def display_county_indicators(county_fips, scenario):
+    """
+    Display key county indicators with simple descriptions based on z-scores.
+
+    Args:
+        county_fips (str): FIPS code for the selected county
+    """
+    # Fetch z-scores for the county (replace with your actual data retrieval)
+    scenario_values = database.get_index_projections(county_fips, scenario)
+
+    # indicators_df = indicators_df[indicators_df["COUNTY_FIPS"] == county_fips]
+
+    # Extract z-scores (assuming your database function returns these values)
+    z_student_teacher = scenario_values.get('z_STUDENT_TEACHER_RATIO', 0)
+    z_housing = scenario_values.get('z_AVAILABLE_HOUSING_UNITS', 0)
+    z_unemployment = scenario_values.get('z_UNEMPLOYMENT_RATE', 0)
+
+    st.markdown("### Key Performance Indicators")
+
+    # Function to get description based on z-score
+    def get_description(z_score, is_inverse=False):
+        if is_inverse:
+            # For inverse indicators (lower is better)
+            if z_score < -1.5:
+                return "Excellent"
+            elif z_score < -0.5:
+                return "Good"
+            elif z_score < 0.5:
+                return "Average"
+            elif z_score < 1.5:
+                return "Below Average"
+            else:
+                return "Poor"
+        else:
+            # For regular indicators (higher is better)
+            if z_score > 1.5:
+                return "Excellent"
+            elif z_score > 0.5:
+                return "Good"
+            elif z_score > -0.5:
+                return "Average"
+            elif z_score > -1.5:
+                return "Below Average"
+            else:
+                return "Poor"
+
+    # Student-Teacher Ratio (lower is better)
+    if z_student_teacher:
+        st.metric(
+            label="Education",
+            value=get_description(z_student_teacher, is_inverse=True),
+            delta=f"{z_student_teacher:.1f}σ",
+            delta_color="inverse"
+        )
+    else:
+        st.metric(
+            label="Education",
+            value="N/A"
+        )
+
+    # Housing Availability (higher is better)
+    if z_housing:
+        st.metric(
+            label="Housing",
+            value=get_description(z_housing),
+            delta=f"{z_housing:.1f}σ",
+            delta_color="normal"
+        )
+    else:
+        st.metric(
+            label="Housing",
+            value="N/A"
+        )
+
+    # Unemployment Rate (lower is better)
+    if z_unemployment:
+        st.metric(
+            label="Labor",
+            value=get_description(z_unemployment, is_inverse=True),
+            delta=f"{z_unemployment:.1f}σ",
+            delta_color="inverse"
+        )
+    else:
+        st.metric(
+            label="Labor",
+            value="N/A"
+        )
+
+    vertical_spacer(1)
+
+    # Optional: Add small explainer
+    with st.expander("About these indicators"):
+        st.caption(
+            "Values show how this county compares to the national average.")
+        st.caption("σ represents standard deviations from the mean.")
