@@ -113,10 +113,11 @@ class DataDownloader:
         if not state_file.exists():
             state_df = ced.download(
                 "acs/acs5",
-                2010,
+                2023,
                 state="*",
                 download_variables=["NAME"],
                 api_key=CONFIG["US_CENSUS_API_KEY"],
+                with_geometry=True,
             )
             # Filter out excluded states using FIPS codes
             state_df = state_df[
@@ -137,7 +138,7 @@ class DataDownloader:
             # Download county data
             counties_df = ced.download(
                 "acs/acs5",
-                2010,
+                2023,
                 state=self.contiguous_states,
                 county="*",
                 download_variables=["NAME"],

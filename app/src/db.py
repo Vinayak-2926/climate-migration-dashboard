@@ -9,7 +9,22 @@ from typing import Optional, List, Union
 
 class Table(Enum):
     # County table
-    COUNTY_METADATA = "county"
+    COUNTY_METADATA_2010 = "census_counties_data_2010"
+    COUNTY_METADATA_2011 = "census_counties_data_2011"
+    COUNTY_METADATA_2012 = "census_counties_data_2012"
+    COUNTY_METADATA_2013 = "census_counties_data_2013"
+    COUNTY_METADATA_2014 = "census_counties_data_2014"
+    COUNTY_METADATA_2015 = "census_counties_data_2015"
+    COUNTY_METADATA_2016 = "census_counties_data_2016"
+    COUNTY_METADATA_2017 = "census_counties_data_2017"
+    COUNTY_METADATA_2018 = "census_counties_data_2018"
+    COUNTY_METADATA_2019 = "census_counties_data_2019"
+    COUNTY_METADATA_2020 = "census_counties_data_2020"
+    COUNTY_METADATA_2021 = "census_counties_data_2021"
+    COUNTY_METADATA_2022 = "census_counties_data_2022"
+    COUNTY_METADATA_2023 = "census_counties_data_2023"
+
+    STATE_METADATA = "state_names"
 
     COUNTY_HOUSING_DATA = "cleaned_housing_data"
     COUNTY_ECONOMIC_DATA = "cleaned_economic_data"
@@ -263,7 +278,7 @@ class Database:
             st.stop()
 
     @st.cache_data
-    def get_county_metadata(_self, county_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
+    def get_county_metadata(_self, county_fips: Optional[Union[str, List[str]]] = None, year: Optional[int] = 2023) -> pd.DataFrame:
         """
         Get county time series data from the specified table
 
@@ -279,8 +294,7 @@ class Database:
         """
         conn = _self.conn
         try:
-            # Start with the base query
-            query = f"SELECT * FROM {Table.COUNTY_METADATA.value}"
+            query = f"SELECT * FROM {getattr(Table, f'COUNTY_METADATA_{year}').value}"
 
             # Add COUNTY_FIPS filter if provided
             if county_fips is not None:
@@ -308,6 +322,48 @@ class Database:
             return df
         except Exception as e:
             st.error(f"Error loading county data counts: {str(e)}")
+            st.stop()
+   
+    @st.cache_data
+    def get_state_metadata(_self, state_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
+        """
+        Get state metadata including geometry data from the database
+        
+        Parameters:
+        -----------
+        state_fips : str or list, optional
+            State FIPS code(s) to query. If None, returns all states.
+            
+        Returns:
+        --------
+        df : pandas.DataFrame
+            DataFrame containing state metadata including geometry
+        """
+        conn = _self.conn
+        try:
+            # Start with the base query
+            query = f"SELECT * FROM {Table.STATE_METADATA.value}"
+            # Add STATE_FIPS filter if provided
+            if state_fips is not None:
+                if isinstance(state_fips, list):
+                    # Create proper parameter placeholders for IN clause
+                    placeholders = ", ".join(
+                        f":fips_{i}" for i in range(len(state_fips)))
+                    query += f" WHERE \"STATE_FIPS\" IN ({placeholders})"
+                    # Create a dictionary of parameters
+                    params = {f"fips_{i}": fips for i, fips in enumerate(state_fips)}
+                else:
+                    query += " WHERE \"STATE_FIPS\" = :state_fips"
+                    params = {'state_fips': state_fips}
+            else:
+                params = {}
+            # Convert to SQLAlchemy text object
+            sql_query = text(query)
+            # Execute query and return as DataFrame
+            df = pd.read_sql(sql_query, conn, params=params)
+            return df
+        except Exception as e:
+            st.error(f"Error loading state metadata: {str(e)}")
             st.stop()
 
     @st.cache_data

@@ -13,6 +13,7 @@ PATHS = {
         "housing": Path("./data/raw/housing_data"),
         "population": Path("./data/raw/population_data"),
         "counties": Path("./data/raw/counties_data"),
+        "state": Path("./data/raw/state_data"),
         "job_openings": Path("./data/raw/monthly_job_openings_csvs_data"),
         "crime": Path("./data/raw/state_crime_data"),
         "fema_nri": Path("./data/raw/county_fema_nri_data"),
@@ -579,6 +580,33 @@ class DataCleaner:
             
             print(f"Cleaned counties data for year {year} saved to {output_path}")
 
+    @classmethod
+    def clean_state_data(cls):
+
+        # Process each state file
+        for file in PATHS["raw_data"]["state"].iterdir():
+            if not file.is_file() or file.suffix != ".csv":
+                continue
+
+            # Read the state data
+            df = pd.read_csv(file, dtype={"STATE": str})
+            
+            # Check if geometry column exists and rename to GEOMETRY
+            if "geometry" in df.columns:
+                df = df.rename(columns={"geometry": "GEOMETRY"})
+            
+            # Create STATE_FIPS by zfilling STATE column
+            if "STATE" in df.columns:
+                df["STATE_FIPS"] = df["STATE"].str.zfill(2)
+            
+            # Set STATE_FIPS as index
+            df = df.set_index("STATE_FIPS")
+            
+            # Save the processed file with the same name
+            output_path =  PATHS["processed"] / file.name
+            df.to_csv(output_path)
+            
+            print(f"Cleaned state data saved to {output_path}")
 
 def main():
     # Process all types of data
@@ -587,6 +615,8 @@ def main():
     # for data_type in data_types:
     for data_type in data_types:
         DataCleaner.process_and_save_data(data_type)
+
+    DataCleaner.clean_state_data()
         
     # Process counties data separately by year
     DataCleaner.clean_counties_data()
