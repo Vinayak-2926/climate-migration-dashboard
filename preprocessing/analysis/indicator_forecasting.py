@@ -1,8 +1,5 @@
 import pandas as pd
 from pathlib import Path
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.discriminant_analysis import StandardScaler
 
 # Define directory paths
@@ -23,6 +20,49 @@ STUDENT_TEACHER_DATA = CLEANED_DIR / "erie_student_teacher.csv"
 POP_PROJECT = PROJECTED_DATA / "county_population_projections.csv"
 POP_2023 = POPULATION_DIR / "census_population_data_2023.csv"
 PUBLIC_SCHOOL_DATA = CLEANED_DIR / "cleaned_public_school_data.csv"
+
+def calculate_z_scores(df):
+    """
+    Calculate z-scores for STUDENT_TEACHER_RATIO, AVAILABLE_HOUSING_UNITS, UNEMPLOYMENT_RATE
+    for each county compared to all other counties nationally
+    """    
+    # Define indicators to calculate z-scores for
+    indicators = ['STUDENT_TEACHER_RATIO', 'AVAILABLE_HOUSING_UNITS', 'UNEMPLOYMENT_RATE']
+    
+    # Make sure indicators exist in the dataframe
+    for indicator in indicators:
+        if indicator not in df.columns:
+            print(f"Warning: {indicator} not found in the data")
+    
+    # Group by scenario to calculate z-scores within each scenario
+    for scenario in df['SCENARIO'].unique():
+        # Filter data for current scenario
+        scenario_mask = df['SCENARIO'] == scenario
+        
+        # Calculate z-scores for each indicator
+        for indicator in indicators:
+            if indicator in df.columns:
+                # Get data for this indicator in this scenario
+                data = df.loc[scenario_mask, indicator]
+                
+                # Skip if all values are NaN
+                if data.isna().all():
+                    print(f"Warning: All values are NaN for {indicator} in scenario {scenario}")
+                    continue
+                
+                # Calculate mean and standard deviation for non-null values
+                mean = data.mean()
+                std = data.std()
+                
+                # Avoid division by zero
+                if std == 0:
+                    print(f"Warning: Standard deviation is 0 for {indicator} in scenario {scenario}")
+                    # Set all z-scores to 0 if std dev is 0
+                    df.loc[scenario_mask, f"z_{indicator}"] = 0
+                else:
+                    # Manually calculate z-scores: (value - mean) / std
+                    df.loc[scenario_mask, f"z_{indicator}"] = ((data - mean) / std).round(4)
+    return df
 
 def load_and_merge_data():
     """Load and merge all datasets into a single dataframe"""
@@ -207,7 +247,6 @@ def calculate_derived_metrics(all_counties_2065_combined, merged_df):
         
         all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "UNEMPLOYMENT_RATE"] = (
             100 - all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "TOTAL_EMPLOYED_PERCENTAGE"])
-    
     # Format the state and county codes
     all_counties_2065_combined["STATE"] = all_counties_2065_combined["STATE"].astype(str).str.zfill(2)
     all_counties_2065_combined["COUNTY"] = all_counties_2065_combined["COUNTY"].astype(str).str.zfill(3)
@@ -270,6 +309,8 @@ def main():
     
     # Calculate derived metrics
     all_counties_2065_combined = calculate_derived_metrics(all_counties_2065_combined, merged_df)
+
+    all_counties_2065_combined = calculate_z_scores(all_counties_2065_combined)
     
     # Save combined projected data
     all_counties_2065_combined.to_csv(PROJECTED_DATA / "combined_2065_data.csv", index=False)
