@@ -846,7 +846,8 @@ def feature_cards(items):
             background-color: blue;
             border: 1px solid rgba(49, 51, 63, 0.2);
             border-radius: 8px;
-            padding: 20px;
+            padding: 0.5em;
+            box-sizing: border-box;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -887,32 +888,6 @@ def feature_cards(items):
 
                 # Add spacing
                 st.markdown("<br>", unsafe_allow_html=True)
-
-                # Apply card styling to this container
-                st.markdown("""
-                <style>
-                    div[data-testid="column"] > div:first-child {
-                        background-color: white;
-                        border: 1px solid rgba(49, 51, 63, 0.2);
-                        border-radius: 8px;
-                        padding: 16px;
-                        height: 100%;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                        transition: transform 0.3s ease, box-shadow 0.3s ease;
-                    }
-                    div[data-testid="column"] > div:first-child:hover {
-                        transform: translateY(-4px);
-                        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-                    }
-                    
-                    div[data-testid="column"] h3 {
-                        margin-top: 4px;
-                        margin-bottom: 4px;
-                        padding-top: 0;
-                        padding-bottom: 0;
-                    }
-                </style>
-                """, unsafe_allow_html=True)
 
 
 def display_scenario_impact_analysis(county_name, state_name, projected_data):
