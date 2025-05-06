@@ -36,7 +36,7 @@ class Table(Enum):
     COUNTY_SOCIOECONOMIC_INDEX_DATA = "socioeconomic_indices"
     COUNTY_SOCIOECONOMIC_RANKING_DATA = "socioeconomic_indices_rankings"
     COUNTY_PROJECTED_INDICES = "projected_socioeconomic_indices"
-    
+
     COUNTY_COMBINED_PROJECTIONS = "combined_2065_data"
 
     # Population related tables
@@ -405,12 +405,12 @@ class Database:
     def get_projections_by_county(_self, county_fips: str) -> pd.DataFrame:
         """
         Get socioeconomic indices for a specific county by FIPS code
-        
+
         Parameters:
         -----------
         county_fips : str
             County FIPS code to query.
-            
+
         Returns:
         --------
         df : pandas.DataFrame
@@ -418,29 +418,30 @@ class Database:
         """
         conn = _self.conn
         try:
-            query = text("SELECT * FROM projected_socioeconomic_indices WHERE \"COUNTY_FIPS\" = :county_fips")
-            
+            query = text(
+                "SELECT * FROM projected_socioeconomic_indices WHERE \"COUNTY_FIPS\" = :county_fips")
+
             # Execute query with parameter
             df = pd.read_sql(query, conn, params={'county_fips': county_fips})
-            
+
             # Reset index and drop the old index
             df = df.reset_index(drop=True)
-            
+
             return df
         except Exception as e:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
             st.stop()
-            
+
     @st.cache_data
     def get_table_for_county(_self, table: Table, county_fips: str) -> pd.DataFrame:
         """
         Get socioeconomic indices for a specific county by FIPS code
-        
+
         Parameters:
         -----------
         county_fips : str
             County FIPS code to query.
-            
+
         Returns:
         --------
         df : pandas.DataFrame
@@ -448,18 +449,45 @@ class Database:
         """
         conn = _self.conn
         try:
-            query = text(f"SELECT * FROM {table.value} WHERE \"COUNTY_FIPS\" = :county_fips")
-            
+            query = text(
+                f"SELECT * FROM {table.value} WHERE \"COUNTY_FIPS\" = :county_fips")
+
             # Execute query with parameter
             df = pd.read_sql(query, conn, params={'county_fips': county_fips})
-            
+
             # Reset index and drop the old index
             df = df.reset_index(drop=True)
-            
+
             return df
         except Exception as e:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
             st.stop()
+
+    @st.cache_data
+    def get_index_projections(_self, county_fips: str, scenario: str):
+        conn = _self.conn
+        try:
+            query = text(
+                'SELECT "SCENARIO", "z_STUDENT_TEACHER_RATIO", "z_AVAILABLE_HOUSING_UNITS", "z_UNEMPLOYMENT_RATE" '
+                f'FROM {Table.COUNTY_COMBINED_PROJECTIONS.value} '
+                'WHERE "COUNTY_FIPS" = :county_fips'
+            )
+            
+            # Execute query with parameter
+            df = pd.read_sql(query, conn, params={'county_fips': county_fips})
+
+            # Reset index and drop the old index
+            df = df.reset_index(drop=True)
+            
+            scenario_id = scenario.split("_")[-1]
+            
+            df = df[df["SCENARIO"] == scenario_id]
+
+            return df.iloc[0]
+        except Exception as e:
+            st.error(f"Error loading socioeconomic indices: {str(e)}")
+            st.stop()
+
 
 # Create a singleton instance for easy import
 db = Database()

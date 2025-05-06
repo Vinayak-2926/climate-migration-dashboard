@@ -45,15 +45,21 @@ with st.sidebar:
         format_func=lambda sel: scenario_names.get(sel),
         index=0
     )
+    
+    cmpt.vertical_spacer(2)
 
     cmpt.display_migration_impact_analysis(
         population_projections.loc[selected_county_fips],
         selected_scenario
     )
 
-    cmpt.vertical_spacer(5)
+    cmpt.vertical_spacer(2)
 
-    cmpt.plot_nri_score(selected_county_fips)
+    cmpt.display_county_indicators(selected_county_fips, selected_scenario)
+
+    # cmpt.vertical_spacer(2)
+
+    # cmpt.plot_nri_score(selected_county_fips)
 
 
 # Short paragraph explaining why climate migration will occur and how
