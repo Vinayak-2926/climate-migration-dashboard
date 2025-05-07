@@ -821,7 +821,7 @@ def display_migration_impact_analysis(projections_dict, scenario):
     # )
 
 
-def feature_cards(items):
+def feature_cards(items, border: bool = False, gap: str = "small"):
     """
     Display a grid of feature cards with material icons, titles, and descriptions.
 
@@ -870,13 +870,13 @@ def feature_cards(items):
     """, unsafe_allow_html=True)
 
     # Create columns for the cards
-    cols = st.columns(len(items))
+    cols = st.columns(len(items), border=border, gap=gap)
 
     # Generate each card in the appropriate column
     for col, item in zip(cols, items):
         with col:
             # Each column gets its own card
-            with st.container(border=True):
+            with st.container():
                 # Show the icon and title
                 if 'icon' in item.keys():
                     st.markdown(f"## **:material/{item['icon']}:**")

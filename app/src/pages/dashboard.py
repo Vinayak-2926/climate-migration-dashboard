@@ -109,7 +109,9 @@ cmpt.feature_cards(
             "description": "Strength of local job markets"},
         {"icon": "cloud_alert", "title": "Climate Risk",
             "description": "Vulnerability to climate hazards"},
-    ]
+    ],
+    border=False,
+    gap="large"
 )
 
 
