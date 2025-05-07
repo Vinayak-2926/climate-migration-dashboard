@@ -7,13 +7,24 @@ from plotly.subplots import make_subplots
 
 from src.db import db as database, Table, get_db_connection
 
-# Display title with custom CSS
-st.html(
-    '<h1 class="custom-title">Is America Ready to Move?</h1>'
-)
-
 # Initialize the Database connection
 get_db_connection()
+
+html_content = """
+<div class="full-width-container">
+    <div class="title-container">
+        <h1 class="hero-title">Is America Ready to Move?</h1>
+        <h2 class="hero-subtitle">Exploring the effects of climate-induced migration on US counties</h5>
+    </div>
+    <div>
+        <span class="arrow-icon">&darr;</span> </div>
+</div>
+"""
+
+# Display the HTML component
+st.html(html_content)
+
+cmpt.vertical_spacer(10)
 
 # Make all database calls using database instead of just db
 counties = database.get_county_metadata().set_index('COUNTY_FIPS')
