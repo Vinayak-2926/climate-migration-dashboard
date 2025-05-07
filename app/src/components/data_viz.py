@@ -571,7 +571,7 @@ def population_by_climate_region(scenario):
         fig.update_layout(
             height=800,
             title=dict(
-                text=f"Projected Population Change by 2065<br><sub>{scenario_title}</sub>",
+                text=f"Effect of Climate Migration on 2065 Population Projections<br><sub>{scenario_title}</sub>",
                 automargin=True,
                 y=0.95  # Adjust vertical position
             ),
@@ -876,7 +876,7 @@ def feature_cards(items):
     for col, item in zip(cols, items):
         with col:
             # Each column gets its own card
-            with st.container():
+            with st.container(border=True):
                 # Show the icon and title
                 if 'icon' in item.keys():
                     st.markdown(f"## **:material/{item['icon']}:**")
@@ -894,32 +894,32 @@ def display_scenario_impact_analysis(county_name, state_name, projected_data):
     """
     Display comprehensive impact analysis based on projected data
     """
-    st.header(f"Migration Impact Analysis")
 
     # Add explanation of the scenarios
-    with st.expander("About the Scenarios", expanded=False):
-        st.markdown("""
-        ### Understanding the Scenarios
-        """)
+    # with st.expander("About the Scenarios", expanded=False):
+    st.markdown("""
+    ### Understanding the Scenarios
+    """)
 
-        # 6. Show current population and projected populations of the county
-        st.markdown("""
-            The population projections shown in this dashboard represent different scenarios for how climate change might affect migration patterns and population distribution across U.S. regions by 2065.
+    # 6. Show current population and projected populations of the county
+    st.markdown("""
+        The population projections shown in this dashboard represent different scenarios for how climate change might affect migration patterns and population distribution across U.S. regions by 2065.
 
-            #### What These Scenarios Mean:
 
-        """)
+    """)
 
-        feature_cards([
-            {"title": "No Impact",
-                "description": "The projection model only considers labor and housing feedback mechanisms"},
-            {"title": "Low Impact",
-                "description": "Model includes modest climate-influenced migration (50% of projected effect)"},
-            {"title": "Medium Impact",
-                "description": "The expected influence of climate migration on migration decisions (100% of projected effect)"},
-            {"title": "High Impact",
-                "description": "Illustrates an intensified scenario where climate factors are more severe (200% of projected effect)"},
-        ])
+    feature_cards([
+        {"title": "No Impact",
+            "description": "The projection model only considers labor and housing feedback mechanisms"},
+        {"title": "Low Impact",
+            "description": "Model includes modest climate-influenced migration (50% of projected effect)"},
+        {"title": "Medium Impact",
+            "description": "The expected influence of climate migration on migration decisions (100% of projected effect)"},
+        {"title": "High Impact",
+            "description": "Illustrates an intensified scenario where climate factors are more severe (200% of projected effect)"},
+    ])
+
+    vertical_spacer(2)
 
     # Create tabs for different impact categories
     tab1, tab2, tab3 = st.tabs(["Employment", "Education", "Housing"])
@@ -1249,6 +1249,7 @@ def socioeconomic_projections(county_fips):
 def generate_policy_recommendations(projected_data):
     """Generate policy recommendations based on the projected data"""
     st.write("# Policy Recommendations")
+    vertical_spacer(2)
 
     # Calculate metrics for recommendations
     recommendations = []
