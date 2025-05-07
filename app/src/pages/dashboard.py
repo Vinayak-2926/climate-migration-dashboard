@@ -7,16 +7,29 @@ from plotly.subplots import make_subplots
 
 from src.db import db as database, Table, get_db_connection
 
-# Display title with custom CSS
-st.html(
-    '<h1 class="custom-title">Is America Ready to Move?</h1>'
-)
-
 # Initialize the Database connection
 get_db_connection()
 
-# Make all database calls using database instead of just db
-counties = database.get_county_metadata().set_index('COUNTY_FIPS')
+html_content = """
+<div class="full-width-container">
+    <div class="title-container">
+        <h1 class="hero-title">Is America Ready to Move?</h1>
+        <h2 class="hero-subtitle">Exploring the effects of climate-induced migration on US counties</h5>
+    </div>
+    <div>
+        <span class="arrow-icon">&darr;</span>
+    </div>
+</div>
+"""
+
+# Display the HTML component
+st.html(html_content)
+
+cmpt.vertical_spacer(10)
+
+counties = database.get_cbsa_counties(filter="metro").set_index('COUNTY_FIPS')
+
+counties = counties[counties["STATE"] != 6]
 
 population_historical = database.get_population_timeseries().set_index('COUNTY_FIPS')
 
@@ -49,7 +62,7 @@ with st.sidebar:
         format_func=lambda sel: scenario_names.get(sel),
         index=0
     )
-    
+
     cmpt.vertical_spacer(2)
 
     cmpt.display_migration_impact_analysis(
@@ -69,11 +82,18 @@ with st.sidebar:
 # Short paragraph explaining why climate migration will occur and how
 st.markdown("""
 # Climate-Induced Migration
+""")
+
+cmpt.vertical_spacer(2)
+
+st.markdown("""
 Climate change is increasingly driving population shifts across the United States. As extreme weather events become more frequent and severe, communities around the country face challenges including sea-level rise, extreme heat, drought, wildfires, and flooding. These environmental pressures are expected to force increasingly more people to relocate from high-risk areas to regions with better climate resilience, impacting local economies, housing markets, and public services.
 """)
 
 # Climate migration choropleth of US counties
 cmpt.plot_nri_choropleth(selected_scenario)
+
+cmpt.vertical_spacer(10)
 
 st.markdown("""
             ### Climate Vulnerability Isn't the Whole Story
@@ -88,14 +108,15 @@ cmpt.feature_cards(
             "description": "Availability of affordable housing"},
         {"icon": "work", "title": "Labor Demand",
             "description": "Strength of local job markets"},
-        {"icon": "cloud_alert", "title": "Climate Risks",
+        {"icon": "cloud_alert", "title": "Climate Risk",
             "description": "Vulnerability to climate hazards"},
-    ]
+    ],
+    border=False,
+    gap="large"
 )
 
 
 # Explain factors that will affect the magnitude of climate-induced migration
-
 with st.expander("Read more about migration factors", icon=":material/article:"):
     st.markdown("""When regions experiencing population loss due to climate concerns face labor shortages, wages tend to rise, creating an economic incentive for some people to stay or even move into these areas despite climate risks. Housing prices also adjust, becoming more affordable in areas experiencing outmigration, which further complicates migration patterns. This economic "dampening effect" means that even highly climate-vulnerable counties won't see mass exoduses, as financial considerations, family ties, and community connections often outweigh climate concerns in people's decision-making process. Migration is ultimately a complex interplay of climate, economic, social, and personal factors rather than a simple response to climate vulnerability alone. The key migration decision factors included in this model are:""")
 
@@ -121,19 +142,48 @@ if selected_county_fips:
                 The data is derived from research on climate-induced migration patterns, which considers factors including extreme weather events, economic opportunities, and regional climate vulnerabilities.
                 """)
 
+    
+
+    # Current County Performance Analysis
+    cmpt.vertical_spacer(20)
+    
+    st.markdown("""
+        # Current County Performance
+        """)
+    
+    cmpt.vertical_spacer(2)
+    
     projected_data = database.get_table_for_county(
         Table.COUNTY_COMBINED_PROJECTIONS, selected_county_fips)
 
+    # Current State of County
     cmpt.display_housing_indicators(
         county_name, state_name, selected_county_fips)
+
+    cmpt.vertical_spacer(5)
+
+    cmpt.display_economic_indicators(
+        county_name, state_name, selected_county_fips)
+
+    cmpt.vertical_spacer(5)
+
+    cmpt.display_education_indicators(
+        county_name, state_name, selected_county_fips)
+
+    # Climate Impact Analysis
+    # st.header("Climate Impact Analysis")
+    cmpt.vertical_spacer(20)
+    st.markdown("""
+        # Climate Migration Impacts
+        """)
     
-    cmpt.display_economic_indicators(county_name, state_name, selected_county_fips)
+    cmpt.vertical_spacer(2)
 
-    cmpt.display_education_indicators(county_name, state_name, selected_county_fips)
-
+    
     # Display the impact analysis
     cmpt.display_scenario_impact_analysis(
         county_name, state_name, projected_data)
 
     # Display policy recommendations
+    cmpt.vertical_spacer(10)
     cmpt.generate_policy_recommendations(projected_data)

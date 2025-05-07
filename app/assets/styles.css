@@ -2,14 +2,71 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital@0;1&display=swap');
 
 /* Styled markdown */
-.custom-title {
+.hero-title {
     font-family: 'Inter', sans-serif;
     font-size: 5.5em;
     margin-top: 2.5em;
-    margin-bottom: 1.5em;
+    margin-bottom: 0.25em;
+    letter-spacing: -0.03em;
+}
+
+.hero-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 300;
+    /* font-size: 5.5em;
+    margin-top: 2.5em;
+    margin-bottom: 0.25em; */
     letter-spacing: -0.03em;
 }
 
 [data-testid="stSidebar"] {
     border-right: 3px solid #EEE;
 }
+
+    /* Apply basic styling to the outer container */
+    .full-width-container {
+        width: 100%; /* Take 100% of the available width in Streamlit's main area */
+        min-height: 70vh; /* Set a minimum height to demonstrate vertical centering relative to something */
+        display: flex; /* Use Flexbox */
+        flex-direction: column; /* Stack children vertically */
+        align-items: center; /* Horizontally center children in the column */
+        justify-content: center; /* Vertically center the flex items block */
+        padding: 20px; /* Add some padding around the content */
+        box-sizing: border-box; /* Include padding in the element's total width and height */
+        text-align: center; /* Center text within flex items by default */
+    }
+
+    /* Style for the title container */
+    .title-container {
+        margin-bottom: 30px; /* Space between the title and the textbox */
+        /* The div itself is horizontally centered by the parent flex container */
+    }
+
+    /* Style for the textbox container */
+    .textbox-container {
+        width: 80%; /* Make the textbox area narrower than the full width */
+        max-width: 500px; /* Set a maximum width */
+        padding: 10px 15px;
+        border: 1px solid #ccc; /* Add a border to look like a textbox */
+        border-radius: 5px; /* Rounded corners */
+        display: flex; /* Use flex to align placeholder text and icon */
+        align-items: center; /* Vertically center items within the textbox */
+        justify-content: space-between; /* Put space between placeholder and icon */
+        background-color: #f9f9f9; /* Light background color */
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1); /* Subtle shadow */
+    }
+
+    /* Style for the placeholder text */
+    .textbox-placeholder {
+        flex-grow: 1; /* Allow placeholder to take up available space */
+        color: #888; /* Grey text for placeholder */
+        text-align: left; /* Align placeholder text to the left */
+        margin-right: 10px; /* Space between placeholder and icon */
+    }
+
+    /* Style for the down arrow icon */
+    .arrow-icon {
+        font-size: 2.5em; /* Size of the arrow */
+        color: #555; /* Color of the arrow */
+        /* The icon is vertically centered by the parent .textbox-container's align-items: center */
+    }
