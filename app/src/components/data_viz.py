@@ -36,24 +36,27 @@ __all__ = [
 ]
 
 # Define the color palette globally to avoid duplication
-RISK_COLORS_RGB = [
-    (0, 196, 218),
-    (134, 210, 222),
-    (231, 214, 189),
-    (214, 103, 103),
-    (209, 55, 52),
+DIVERGING_RGB = [
+    "rgb(0, 196, 218)",
+    "rgb(134, 210, 222)",
+    "rgb(231, 214, 189)",
+    "rgb(214, 103, 103)",
+    "rgb(209, 55, 52)",
 ]
 
-
-# Generate color formats once
-RISK_COLORS_RGBA = [f"rgba({r}, {g}, {b}, 1)" for r, g, b in RISK_COLORS_RGB]
-RISK_COLORS_RGB_STR = [f"rgb({r}, {g}, {b})" for r, g, b in RISK_COLORS_RGB]
+MONOCHROME_RGB = [
+    "rgb(0, 92, 102)",
+    "rgb(0, 147, 163)",
+    "rgb(0, 196, 218)",
+    "rgb(31, 233, 255)",
+    "rgb(178, 255, 246)",
+]
 
 # Risk level labels
 RISK_LEVELS = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 
 # Map risk categories to colors
-RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, RISK_COLORS_RGB_STR))
+RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, DIVERGING_RGB))
 
 choropleth_config = {
     'displayModeBar': False,
@@ -64,7 +67,7 @@ choropleth_config = {
 def get_risk_color(score, opacity=1.0):
     """Get color for a risk score with specified opacity"""
     color_index = min(int(score // 20), 4)
-    r, g, b = RISK_COLORS_RGB[color_index]
+    r, g, b = DIVERGING_RGB[color_index]
     return f"rgba({r}, {g}, {b}, {opacity})"
 
 
@@ -91,11 +94,11 @@ def plot_nri_score(county_fips):
                 'color': bar_color,
             },
             'steps': [
-                {'range': [0, 20], 'color': RISK_COLORS_RGBA[0]},
-                {'range': [20, 40], 'color': RISK_COLORS_RGBA[1]},
-                {'range': [40, 60], 'color': RISK_COLORS_RGBA[2]},
-                {'range': [60, 80], 'color': RISK_COLORS_RGBA[3]},
-                {'range': [80, 100], 'color': RISK_COLORS_RGBA[4]},
+                {'range': [0, 20], 'color': MONOCHROME_RGB[0]},
+                {'range': [20, 40], 'color': MONOCHROME_RGB[1]},
+                {'range': [40, 60], 'color': MONOCHROME_RGB[2]},
+                {'range': [60, 80], 'color': MONOCHROME_RGB[3]},
+                {'range': [80, 100], 'color': MONOCHROME_RGB[4]},
             ]
         }
     ))
@@ -495,7 +498,7 @@ def population_by_climate_region(scenario):
             counties_data,
             geojson=counties,
             color='VARIATION_PCT',
-            color_continuous_scale='RdBu_r',  # Red-Blue diverging scale
+            color_continuous_scale=DIVERGING_RGB,  # Red-Blue diverging scale
             range_color=[-max_abs_pct_change,
                          max_abs_pct_change],  # Symmetric scale
             locations='COUNTY_FIPS',
@@ -1015,17 +1018,13 @@ def create_housing_chart(projected_data):
     # Create the horizontal bar chart
     fig = go.Figure()
 
-    # Sort the data by AVAILABLE_HOUSING_UNITS for better visualization
-    sorted_data = df.sort_values('AVAILABLE_HOUSING_UNITS')
-
     fig.add_trace(go.Bar(
-        y=sorted_data['SCENARIO'],
-        x=sorted_data['AVAILABLE_HOUSING_UNITS'],
+        y=df['SCENARIO'],
+        x=df['AVAILABLE_HOUSING_UNITS'],
         orientation='h',
         marker=dict(
-            color=sorted_data['AVAILABLE_HOUSING_UNITS'].apply(
-                lambda x: '#E07069' if x < 0 else '#509BC7'),
-            line=dict(color='rgba(0, 0, 0, 0.2)', width=1)
+            color=df['AVAILABLE_HOUSING_UNITS'].apply(
+                lambda x: DIVERGING_RGB[3] if x < 0 else DIVERGING_RGB[0]),
         )
     ))
 
@@ -1052,7 +1051,7 @@ def create_housing_chart(projected_data):
     fig.add_shape(
         type="line",
         x0=0, y0=-0.5,
-        x1=0, y1=len(sorted_data) - 0.5,
+        x1=0, y1=len(df) - 0.5,
         line=dict(color="black", width=1, dash="solid")
     )
 
@@ -1080,7 +1079,7 @@ def create_student_teacher_chart(projected_data):
             y=df['STUDENT_TEACHER_RATIO'],
             marker=dict(
                 color=[
-                    '#E07069' if ratio > optimal_ratio else '#509BC7'
+                    DIVERGING_RGB[3] if ratio > optimal_ratio else DIVERGING_RGB[0]
                     for ratio in df['STUDENT_TEACHER_RATIO']
                 ]
             ),
@@ -1148,7 +1147,7 @@ def create_employment_chart(projected_data):
     df['UNEMPLOYED_PERCENTAGE'] = 100 - df['TOTAL_EMPLOYED_PERCENTAGE']
 
     # Sort the dataframe by SCENARIO
-    df = df.sort_values('SCENARIO')
+    df = df.sort_values('SCENARIO', ascending=False)
 
     # Define the NAIRU threshold
     nairu_threshold = 4.0
@@ -1159,7 +1158,7 @@ def create_employment_chart(projected_data):
     # Add traces for employed and unemployed percentages
     for index, row in df.iterrows():
         # Determine color for unemployed percentage bar
-        unemployed_color = '#E07069' if row['UNEMPLOYED_PERCENTAGE'] > nairu_threshold else '#F0D55D'
+        unemployed_color = DIVERGING_RGB[3] if row['UNEMPLOYED_PERCENTAGE'] > nairu_threshold else DIVERGING_RGB[2]
 
         # Add employed percentage bar
         fig.add_trace(
@@ -1168,7 +1167,7 @@ def create_employment_chart(projected_data):
                 y=[row['SCENARIO']],
                 x=[row['TOTAL_EMPLOYED_PERCENTAGE']],
                 orientation='h',
-                marker=dict(color='#509BC7'),
+                marker=dict(color=DIVERGING_RGB[0]),
                 text=[format_percentage(row['TOTAL_EMPLOYED_PERCENTAGE'])],
                 textposition='inside',
                 hoverinfo='text',
@@ -1438,32 +1437,36 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
         merged_df,
         x='YEAR',  # Use the column name from the index reset
         y='Median_Rent_Burden_Pct',
-        title=f'Median Rent Burden Over Time'
+        title=f'Median Rent Burden Over Time',
+    )
+
+    fig.update_traces(
+        line=dict(color=DIVERGING_RGB[0], width=7)
     )
 
     fig.update_layout(
-        xaxis_title='Year',  # Display title can be 'Year'
+        xaxis_title='Year',
         yaxis_title='Median Rent Burden (%)',
         hovermode='x unified'
     )
 
     fig.add_shape(
         type="line",
-        x0=merged_df['YEAR'].min(),  # Use the column name
-        x1=merged_df['YEAR'].max(),  # Use the column name
+        x0=merged_df['YEAR'].min(),
+        x1=merged_df['YEAR'].max(),
         y0=30,
         y1=30,
-        line=dict(color="orange", dash="dash", width=2),
+        line=dict(color=DIVERGING_RGB[3], dash="dash", width=4),
         name="30% Threshold"
     )
 
     fig.add_shape(
         type="line",
-        x0=merged_df['YEAR'].min(),  # Use the column name
-        x1=merged_df['YEAR'].max(),  # Use the column name
+        x0=merged_df['YEAR'].min(),
+        x1=merged_df['YEAR'].max(),
         y0=50,
         y1=50,
-        line=dict(color="red", dash="dash", width=2),
+        line=dict(color=DIVERGING_RGB[4], dash="dash", width=4),
         name="50% Threshold"
     )
 
@@ -1474,7 +1477,7 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
         showarrow=False,
         yshift=10,
         xshift=20,
-        font=dict(color="orange")
+        font=dict(color=DIVERGING_RGB[3])
     )
 
     fig.add_annotation(
@@ -1484,8 +1487,10 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
         showarrow=False,
         yshift=10,
         xshift=20,
-        font=dict(color="red")
+        font=dict(color=DIVERGING_RGB[4])
     )
+
+    fig.update_yaxes(range=[0, 60])
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1540,7 +1545,11 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
         merged_df,
         x='YEAR',
         y='Vacancy_Rate_Pct',
-        title=f'Housing Vacancy Rate Over Time'
+        title=f'Housing Vacancy Rate Over Time',
+    )
+    
+    fig.update_traces(
+        line=dict(color=DIVERGING_RGB[0], width=7)
     )
 
     fig.update_layout(
@@ -1550,13 +1559,14 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
     )
 
     healthy_vacancy_threshold = 7
+    threshold_color = DIVERGING_RGB[3]
     fig.add_shape(
         type="line",
         x0=merged_df['YEAR'].min(),
         x1=merged_df['YEAR'].max(),
         y0=healthy_vacancy_threshold,
         y1=healthy_vacancy_threshold,
-        line=dict(color="green", dash="dash", width=2),
+        line=dict(color=threshold_color, dash="dash", width=4),
         name=f"{healthy_vacancy_threshold}% Threshold"
     )
     fig.add_annotation(
@@ -1566,8 +1576,10 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
         showarrow=False,
         yshift=10,
         xshift=20,
-        font=dict(color="green")
+        font=dict(color=threshold_color)
     )
+
+    fig.update_yaxes(range=[0, 20])
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1605,6 +1617,10 @@ def display_unemployment_rate(county_name, state_name, county_fips):
         y='UNEMPLOYMENT_RATE',
         title=f'Unemployment Rate Over Time'
     )
+    
+    fig.update_traces(
+        line=dict(color=DIVERGING_RGB[0], width=7)
+    )
 
     fig.update_layout(
         xaxis_title='Year',
@@ -1614,13 +1630,15 @@ def display_unemployment_rate(county_name, state_name, county_fips):
     )
 
     healthy_vacancy_threshold = 4
+    threshold_color = DIVERGING_RGB[3]
+    
     fig.add_shape(
         type="line",
         x0=unemployment_df['YEAR'].min(),
         x1=unemployment_df['YEAR'].max(),
         y0=healthy_vacancy_threshold,
         y1=healthy_vacancy_threshold,
-        line=dict(color="green", dash="dash", width=2),
+        line=dict(color=threshold_color, dash="dash", width=2),
         name=f"NAIRU Threshold"
     )
 
@@ -1631,8 +1649,10 @@ def display_unemployment_rate(county_name, state_name, county_fips):
         showarrow=False,
         yshift=10,
         xshift=20,
-        font=dict(color="green")
+        font=dict(color=threshold_color)
     )
+    
+    fig.update_yaxes(range=[0, 15])
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1685,8 +1705,8 @@ def display_labor_participation(county_name, state_name, county_fips):
             fill='tozeroy',
             mode='lines',
             name='Total Population',
-            line=dict(color='#b1d2e7', width=1),
-            fillcolor='#b1d2e7'
+            line=dict(color=MONOCHROME_RGB[0], width=1),
+            fillcolor=MONOCHROME_RGB[0]
         )
     )
 
@@ -1711,8 +1731,8 @@ def display_labor_participation(county_name, state_name, county_fips):
             fill='tozeroy',
             mode='lines',
             name='Employed Population',
-            line=dict(color='#265c7d', width=2),
-            fillcolor='#265c7d'
+            line=dict(color=MONOCHROME_RGB[2], width=2),
+            fillcolor=MONOCHROME_RGB[2]
         )
     )
 
@@ -1725,11 +1745,11 @@ def display_labor_participation(county_name, state_name, county_fips):
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=0.95,
+            y=1.05,
             xanchor='center',
             x=0.5
         ),
-        margin=dict(l=60, r=60, t=50, b=50)
+        margin=dict(l=60, r=60, t=100, b=50)
     )
 
     # Display the chart in Streamlit
@@ -1778,10 +1798,10 @@ def display_education_indicators(county_name, state_name, county_fips):
 
     # Define colors for better visualization
     colors = {
-        "Less than High School": RISK_COLORS_RGBA[3],
-        "High School Graduate": RISK_COLORS_RGBA[2],
-        "Some College": RISK_COLORS_RGBA[1],
-        "Bachelor's or Higher": RISK_COLORS_RGBA[0]
+        "Less than High School": DIVERGING_RGB[3],
+        "High School Graduate": DIVERGING_RGB[2],
+        "Some College": DIVERGING_RGB[1],
+        "Bachelor's or Higher": DIVERGING_RGB[0]
     }
 
     # Add traces in reverse order (highest education first) for better stacking visualization
@@ -1873,9 +1893,11 @@ def display_education_indicators(county_name, state_name, county_fips):
             x=0.5
         ),
         margin=dict(l=40, r=40, t=40, b=100),
-        autosize=True,
+        autosize=False,
         hovermode="x unified"
     )
+    
+    
 
     # Display the chart
     st.plotly_chart(fig, use_container_width=True)
