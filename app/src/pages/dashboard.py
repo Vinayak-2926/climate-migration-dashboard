@@ -27,8 +27,9 @@ st.html(html_content)
 
 cmpt.vertical_spacer(10)
 
-# Make all database calls using database instead of just db
-counties = database.get_county_metadata().set_index('COUNTY_FIPS')
+counties = database.get_cbsa_counties(filter="metro").set_index('COUNTY_FIPS')
+
+counties = counties[counties["STATE"] != 6]
 
 population_historical = database.get_population_timeseries().set_index('COUNTY_FIPS')
 

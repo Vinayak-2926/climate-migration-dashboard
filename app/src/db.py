@@ -313,29 +313,39 @@ class Database:
     @st.cache_data
     def get_cbsa_counties(_self, filter: Optional[str] = None) -> pd.DataFrame:
         """
-        Get counties that belong to a metropolitan statistical area (MSA)
-
+        Get counties that belong to a metropolitan statistical area (MSA) along with their metadata
+        
         Parameters:
         -----------
         filter : str, optional
             Type of CBSA to filter for.
             Valid values: 'metro', 'micro', or None (returns all)
             Default is None.
-
+            
         Returns:
         --------
         df : pandas.DataFrame
-            DataFrame containing the counties along with MSA data
+            DataFrame containing the counties along with MSA data and county metadata
         """
         conn = _self.conn
         try:
-            query = f'SELECT "COUNTY_FIPS", "CBSA", "TYPE" FROM {Table.COUNTY_CBSA_DATA.value}'
+            # Base query with JOIN to get metadata for matching COUNTY_FIPS
+            query = f'''
+                SELECT 
+                    cbsa."CBSA", 
+                    cbsa."TYPE",
+                    meta.*
+                FROM {Table.COUNTY_CBSA_DATA.value} cbsa
+                JOIN {Table.COUNTY_METADATA.value} meta
+                ON cbsa."COUNTY_FIPS" = meta."COUNTY_FIPS"
+            '''
 
+            # Apply filter if provided
             if filter is not None and isinstance(filter, str):
                 if filter == 'metro':
-                    query += f" WHERE \"TYPE\" = 'Metropolitan Statistical Area'"
+                    query += f" WHERE cbsa.\"TYPE\" = 'Metropolitan Statistical Area'"
                 elif filter == 'micro':
-                    query += f" WHERE \"TYPE\" = 'Micropolitan Statistical Area'"
+                    query += f" WHERE cbsa.\"TYPE\" = 'Micropolitan Statistical Area'"
 
             # Execute query and return as DataFrame
             df = pd.read_sql(query, conn)
