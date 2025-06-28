@@ -18,21 +18,20 @@ echo Starting data pipeline for: %ENVIRONMENT% environment
 echo ==================================================
 
 REM Check if config can be imported (validates environment setup)
-python -c "from config import get_config; get_config().get_env_info()" || (
+python -c "from src.shared.config import PipelineConfig; PipelineConfig().get_env_info()" || (
     echo Error: Configuration validation failed. Check your .env.%ENVIRONMENT% file.
     pause
     exit /b 1
 )
 
-REM Run the pipeline
-python -m preprocessing.acquisition.download_counties && ^
-python -m preprocessing.acquisition.download_raw_data && ^
-python -m preprocessing.cleaning.convert_xlsx_to_csvs && ^
+REM Run the new pipeline
+python src/pipeline/scripts/run_acquisition.py && ^
+python src/pipeline/scripts/run_cleaning.py && ^
 python -m preprocessing.analysis.historical_population && ^
 python -m preprocessing.analysis.population_forecasting && ^
 python -m preprocessing.cleaning.clean_data && ^
 python -m preprocessing.analysis.indicator_forecasting && ^
-python -m preprocessing.database.update_database
+python src/pipeline/scripts/run_database_update.py
 
 if %errorlevel% equ 0 (
     echo ==================================================
