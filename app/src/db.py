@@ -1,10 +1,9 @@
-import os
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
 from enum import Enum
 from typing import Optional, List, Union
+from config import get_config
 
 
 class Table(Enum):
@@ -42,22 +41,11 @@ class Database:
         if self._initialized:
             return
 
-        # Load environment-specific .env file
-        # Default to dev, change to prod when deploying
-        ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
-        env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
-        load_dotenv(env_file)
-
-        # Fix Heroku connection string
-        self.database_url = os.getenv("DATABASE_URL")
-
-        if self.database_url is None:
-            raise ValueError(
-                "DATABASE_URL not found in environment variables.")
-
-        # Set SSL mode based on environment
-        self.ssl_mode = "require" if ENVIRONMENT == "prod" else "disable"
-        self.environment = ENVIRONMENT
+        # Get configuration from centralized config module
+        self.config = get_config()
+        self.database_url = self.config.database_url
+        self.ssl_mode = self.config.ssl_mode
+        self.environment = self.config.environment
         self.conn = None
         self._initialized = True
 
@@ -68,16 +56,17 @@ class Database:
 
         try:
             engine = create_engine(
-                self.database_url.replace("postgres://", "postgresql://", 1),
+                self.database_url,
                 connect_args={"sslmode": self.ssl_mode},
             )
 
             self.conn = engine.connect()
 
-            print(
-                f"Dashboard running from \033[1m{self.environment}\033[0m environment")
-            print(
-                f"Database connection established via URL: \033[1m{self.conn.engine.url}\033[0m")
+            # Print environment info for debugging
+            env_info = self.config.get_env_info()
+            print(f"Dashboard running from \033[1m{env_info['environment']}\033[0m environment")
+            print(f"Database connection established to: \033[1m{env_info['database_url_host']}\033[0m")
+            print(f"SSL Mode: \033[1m{env_info['ssl_mode']}\033[0m")
             print()
 
             return self.conn

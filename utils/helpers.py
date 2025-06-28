@@ -1,29 +1,26 @@
-import os
 from sqlalchemy import create_engine
-from dotenv import load_dotenv
+from config import get_config
 
-# Load environment-specific .env file
-ENVIRONMENT = os.getenv(
-    "ENVIRONMENT", "prod"
-)  # Default to dev, change to prod when deploying
-env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
-load_dotenv(env_file)
-
-# Fix Heroku connection string
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Set SSL mode based on environment
-SSL_MODE = "require" if ENVIRONMENT == "prod" else "disable"
+# Get configuration from centralized config module
+config = get_config()
+DATABASE_URL = config.database_url
+SSL_MODE = config.ssl_mode
 
 
 def get_db_connection():
     """Create and return a PostgreSQL database connection"""
     try:
         engine = create_engine(
-            DATABASE_URL.replace("postgres://", "postgresql://", 1),
+            DATABASE_URL,
             connect_args={"sslmode": SSL_MODE},
         )
         conn = engine.connect()
+
+        # Print environment info for debugging
+        env_info = config.get_env_info()
+        print(f"Pipeline connecting to \033[1m{env_info['environment']}\033[0m environment")
+        print(f"Database host: \033[1m{env_info['database_url_host']}\033[0m")
+
         return conn
     except Exception as e:
         raise Exception(f"Database connection failed: {str(e)}")

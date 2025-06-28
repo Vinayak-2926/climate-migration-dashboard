@@ -1,5 +1,9 @@
+import sys
 import pathlib
 import streamlit as st
+
+# Add project root to Python path to import config module
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from src.utils import add_custom_css
 
