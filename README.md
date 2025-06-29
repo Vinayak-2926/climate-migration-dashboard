@@ -56,8 +56,39 @@ An interactive dashboard for analyzing climate-driven migration patterns across 
 
 8. Launch dashboard:
    ```
-   streamlit run app/main.py
+   # Using deployment script (recommended)
+   ./scripts/run_webapp.sh           # MacOS/Linux
+   .\scripts\run_webapp.bat          # Windows
+   
+   # Or directly with Streamlit
+   streamlit run src/dashboard/main.py
    ```
+
+## Architecture
+
+This project uses a modular architecture with shared components:
+
+### Directory Structure
+- `src/shared/` - Framework-agnostic shared components
+  - `config/` - Configuration management for different environments
+  - `database/` - Database connections, models, and base queries
+  - `utils/` - Common utility functions
+- `src/pipeline/` - Data processing pipeline
+  - `acquisition/` - Data collection scripts
+  - `cleaning/` - Data preprocessing
+  - `database/` - Pipeline-specific database operations
+  - `scripts/` - Pipeline execution scripts
+- `src/dashboard/` - Streamlit web application
+  - `components/` - UI components and visualizations
+  - `database/` - Web app database client with caching
+  - `pages/` - Streamlit page definitions
+  - `main.py` - Application entry point
+
+### Key Features
+- **Separation of Concerns**: Pipeline and web app use separate database clients with context-specific functionality
+- **Shared Components**: Common database models and queries are reused across pipeline and web app
+- **Environment Configuration**: Supports dev/prod environments with separate configurations
+- **Streamlit Caching**: Web app database client includes `@st.cache_data` decorators for performance
 
 ## Data Structure
 
