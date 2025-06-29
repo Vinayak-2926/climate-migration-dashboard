@@ -6,9 +6,10 @@ from shapely.ops import unary_union
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from src.components.utils import *
+from .utils import *
 
-from src.db import db as database, Table
+from src.shared.database import Table
+from src.dashboard.database import db as database
 
 from shapely import wkt
 from urllib.request import urlopen

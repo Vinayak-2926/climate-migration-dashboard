@@ -2,13 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import src.components as cmpt
+import src.dashboard.components as cmpt
 from plotly.subplots import make_subplots
 
-from src.db import db as database, Table, get_db_connection
+from src.shared.database import Table
+from src.dashboard.database import db as database
 
 # Initialize the Database connection
-get_db_connection()
+database.connect()
 
 html_content = """
 <div class="full-width-container">
