@@ -6,6 +6,20 @@ __all__ = [
     "split_row"
 ]
 
+# def text_centered(text: str):
+#     st.markdown(f"""<p style="color: red; text-align: center;">{text}</p>""", unsafe_allow_html=True)
+    
+def quote_box(text: str):
+    st.html(f"""
+            <div class="quote-container">
+                <div class="quote-box">
+                    <p class="quote-text">
+                        {text}
+                    </p>
+                </div>
+            </div>
+            """)
+
 def vertical_spacer(n=1):
     """
     Adds vertical space to a Streamlit app using HTML line breaks.
