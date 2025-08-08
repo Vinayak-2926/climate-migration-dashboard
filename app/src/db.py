@@ -45,8 +45,8 @@ class Database:
         # Load environment-specific .env file
         # Default to dev, change to prod when deploying
         ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
-        env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
-        load_dotenv(env_file)
+        env_file = f".env.{ENVIRONMENT}"
+        load_dotenv(env_file, override=True)
 
         # Fix Heroku connection string
         self.database_url = os.getenv("DATABASE_URL")
@@ -67,12 +67,12 @@ class Database:
             return self.conn
 
         try:
-            engine = create_engine(
+            self.engine = create_engine(
                 self.database_url.replace("postgres://", "postgresql://", 1),
                 connect_args={"sslmode": self.ssl_mode},
             )
 
-            self.conn = engine.connect()
+            self.conn = self.engine.connect()
 
             print(
                 f"Dashboard running from \033[1m{self.environment}\033[0m environment")
@@ -440,6 +440,18 @@ class Database:
             return df.iloc[0]
         except Exception as e:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
+            st.stop()
+            
+    @st.cache_data
+    def get_receiver_places(_self):
+        conn = _self.conn
+        
+        try:
+            df = pd.read_sql("SELECT * FROM receiver_place_with_geometry", _self.engine)
+            print(df.columns)
+            return df
+        except Exception as e:
+            st.error(f"Error loading receiver places: {str(e)}")
             st.stop()
 
 

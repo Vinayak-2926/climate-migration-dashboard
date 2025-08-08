@@ -27,6 +27,7 @@ __all__ = [
     "plot_nri_choropleth",
     "plot_nri_score",
     "plot_climate_hazards",
+    "receiver_places_choropleth",
     "plot_socioeconomic_indices",
     "plot_socioeconomic_radar",
     "population_by_climate_region",
@@ -281,7 +282,99 @@ def plot_nri_choropleth():
         st.error(f"Could not create map: {e}")
         print(f"Could not connect to url or create map.\n{e}")
         return None
+    
+def receiver_places_choropleth():
+    try:
+        # Get receiver places data
+        county_data = database.get_receiver_places()
 
+        # Convert WKT to geometry objects with error handling
+        county_data['geometry'] = county_data['GEOMETRY'].apply(
+            lambda x: wkt.loads(x) if isinstance(x, str) else x)
+
+        # Create GeoDataFrame first (needed for proper GeoSeries)
+        gdf = gpd.GeoDataFrame(county_data)
+
+        # Now simplify the geometry (this is a GeoSeries method)
+        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
+
+        # Convert to GeoJSON format for Plotly
+        geojson_data = json.loads(gdf.to_json())
+        
+        # Define discrete color mapping for is_receiving_county
+        color_discrete_map = {
+            "No": "rgb(230, 230, 230)",
+            "Maybe": DIVERGING_RGB[1],
+            "Yes": DIVERGING_RGB[0]
+        }
+        
+        # Create choropleth map using discrete colors
+        fig = px.choropleth(
+            gdf,
+            geojson=geojson_data,
+            color='is_receiving_county',
+            color_discrete_map=color_discrete_map,
+            locations=county_data.index,
+            scope="usa",
+            labels={
+                'is_receiving_county': 'Receiving County'
+            },
+            hover_data={
+                'county': True,
+                'is_receiving_county': True,
+            },
+            title="Climate Migration Receiver Places"
+        )
+        
+        # Update hover template
+        fig.update_traces(
+            hovertemplate='<b>%{customdata[0]}</b><br>' +
+            'Receiver place: %{customdata[1]}<br>' +
+            '<extra></extra>',
+            marker_line_width=0
+        )
+        
+        # Configure the map layout
+        fig.update_geos(
+            visible=False,
+            scope="usa",
+            showcoastlines=True,
+            projection_type="albers usa"
+        )
+        
+        fig.update_layout(
+            height=800,
+            title=dict(
+                text="PLACE Initiative - Receiver Places",
+                automargin=True,
+                y=0.95
+            ),
+            margin=dict(t=100, b=50, l=50, r=50),
+            autosize=True,
+            legend=dict(
+                title="County is a receiver place?",
+                orientation="v",
+                yanchor="top",
+                y=0.9,
+                xanchor="left",
+                x=1.01
+            )
+        )
+        
+        # Display the chart
+        event = st.plotly_chart(fig,
+                                on_select="ignore",
+                                selection_mode=["points"],
+                                config=choropleth_config
+                                )
+        
+        return event
+        
+    except Exception as e:
+        st.error(f"Could not create receiver places map: {e}")
+        print(f"Could not create receiver places map.\\n{e}")
+        return None
+    
 
 def population_by_climate_region(scenario):
     """

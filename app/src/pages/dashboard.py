@@ -7,6 +7,7 @@ import src.components as cmpt
 from plotly.subplots import make_subplots
 
 from src.db import db as database, Table, get_db_connection
+
 # Initialize the Database connection
 get_db_connection()
 
@@ -75,14 +76,18 @@ with st.sidebar:
 
     cmpt.display_county_indicators(selected_county_fips, selected_scenario)
 
-    # cmpt.vertical_spacer(2)
+    cmpt.vertical_spacer(2)
 
-    # cmpt.plot_nri_score(selected_county_fips)
+    cmpt.plot_nri_score(selected_county_fips)
 
 # Climate migration choropleth of US counties
-cmpt.plot_nri_choropleth(selected_scenario)
+cmpt.plot_nri_choropleth()
 
-cmpt.vertical_spacer(10)
+quote_box("""While the effects of climate change will be felt across the entirety of America, as the National Risk Index map demonstrates, the hazards and risks associated with climate hazards vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods. While currently seen as more climate-resilient, their long-term safety will depend on proactive governance and sustained adaptation efforts.""")
+
+cmpt.vertical_spacer(5)
+
+cmpt.receiver_places_choropleth()
 
 st.markdown("""
             ### Climate Vulnerability Isn't the Whole Story
