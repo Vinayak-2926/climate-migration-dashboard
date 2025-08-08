@@ -3,7 +3,8 @@ import streamlit as st
 
 __all__ = [
     "vertical_spacer",
-    "split_row"
+    "split_row",
+    "quote_box"
 ]
 
 # def text_centered(text: str):
