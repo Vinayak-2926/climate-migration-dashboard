@@ -83,7 +83,7 @@ with st.sidebar:
 # Climate migration choropleth of US counties
 cmpt.plot_nri_choropleth()
 
-quote_box("""While the effects of climate change will be felt across the entirety of America, as the National Risk Index map demonstrates, the hazards and risks associated with climate hazards vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods. While currently seen as more climate-resilient, their long-term safety will depend on proactive governance and sustained adaptation efforts.""")
+quote_box("""Climate change will undoubtedly impact the lives of all Americans, but as the map above shows, the hazards and risks associated with a changing climate vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods.""")
 
 cmpt.vertical_spacer(5)
 
