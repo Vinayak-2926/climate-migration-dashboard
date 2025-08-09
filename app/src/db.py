@@ -45,8 +45,8 @@ class Database:
         # Load environment-specific .env file
         # Default to dev, change to prod when deploying
         ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
-        env_file = f".env.{ENVIRONMENT}"
-        load_dotenv(env_file, override=True)
+        env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
+        load_dotenv(env_file)
 
         # Fix Heroku connection string
         self.database_url = os.getenv("DATABASE_URL")
@@ -448,7 +448,6 @@ class Database:
         
         try:
             df = pd.read_sql("SELECT * FROM receiver_place_with_geometry", _self.engine)
-            print(df.columns)
             return df
         except Exception as e:
             st.error(f"Error loading receiver places: {str(e)}")
