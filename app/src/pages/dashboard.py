@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from app.src.components.utils import quote_box
 import src.components as cmpt
 from plotly.subplots import make_subplots
 
@@ -25,8 +24,7 @@ st.html(
     """
 )
 
-quote_box("Climate change is already profoundly reshaping where Americans reside and where continued habitation is no longer viable. The increasing frequency of wildfires, floods, extreme heat waves, and rising sea levels has already displaced over 3.2 million people in the United States between 2000 and 2020 alone. Projections indicate that by 2070, sea level rise could disrupt the lives of an additional 13 million individuals.")
-
+cmpt.quote_box("Climate change is already profoundly reshaping where Americans reside and where continued habitation is no longer viable. The increasing frequency of wildfires, floods, extreme heat waves, and rising sea levels has already displaced over 3.2 million people in the United States between 2000 and 2020 alone. Projections indicate that by 2070, sea level rise could disrupt the lives of an additional 13 million individuals.")
 cmpt.vertical_spacer(10)
 
 counties = database.get_cbsa_counties(filter="metro").set_index('COUNTY_FIPS')
@@ -83,7 +81,7 @@ with st.sidebar:
 # Climate migration choropleth of US counties
 cmpt.plot_nri_choropleth()
 
-quote_box("""Climate change will undoubtedly impact the lives of all Americans, but as the map above shows, the hazards and risks associated with a changing climate vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods.""")
+cmpt.quote_box("""Climate change will undoubtedly impact the lives of all Americans, but as the map above shows, the hazards and risks associated with a changing climate vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods.""")
 
 cmpt.vertical_spacer(5)
 
