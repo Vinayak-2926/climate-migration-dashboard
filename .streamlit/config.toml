@@ -1,9 +1,10 @@
 [theme]
-
-font = "Roboto"
-
-headingFont = "Inter"
-
-[theme.sidebar]
-
+base = "light"                # or "dark"
 backgroundColor = "white"
+font = "sans serif"            # options: "sans serif", "serif", "monospace"
+
+[client]
+showSidebarNavigation = true   # optional, controls sidebar behavior
+
+[server]
+fileWatcherType = "none"
