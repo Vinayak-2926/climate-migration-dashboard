@@ -1,10 +1,8 @@
 [theme]
-base = "light"                # or "dark"
+base = "light"
 backgroundColor = "white"
-font = "sans serif"            # options: "sans serif", "serif", "monospace"
-
-[client]
-showSidebarNavigation = true   # optional, controls sidebar behavior
+font = "Roboto"
+headingFont = "Inter"
 
 [server]
 fileWatcherType = "none"
