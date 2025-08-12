@@ -204,12 +204,12 @@ def plot_nri_choropleth():
             scope="usa",
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME': True,
+                'COUNTY_NAME_x': True,
                 'CLIMATE_REGION': True,
                 'FEMA_NRI': True,
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI'],
+            custom_data=['COUNTY_NAME_x', 'CLIMATE_REGION', 'FEMA_NRI'],
         )
 
         # Update hover template to format the display nicely
@@ -508,20 +508,20 @@ def population_by_climate_region(scenario):
             locations='COUNTY_FIPS',
             scope="usa",
             labels={
-                'COUNTY_NAME': 'County',
+                'COUNTY_NAME_x': 'County',
                 'CLIMATE_REGION': 'Climate Region',
                 scenario: 'Population (2065)',
                 'VARIATION_PCT': 'Population Change (%)'
             },
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME': True,
+                'COUNTY_NAME_x': True,
                 'CLIMATE_REGION': True,
                 scenario: True,
                 'VARIATION_PCT': ':.2f',
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION',
+            custom_data=['COUNTY_NAME_x', 'CLIMATE_REGION',
                          scenario, 'VARIATION_PCT']
         )
 
