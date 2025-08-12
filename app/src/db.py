@@ -45,8 +45,8 @@ class Database:
         # Load environment-specific .env file
         # Default to dev, change to prod when deploying
         ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
-        env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
-        load_dotenv(env_file)
+        env_file = f".env.{ENVIRONMENT}"
+        load_dotenv(env_file, override=True)
 
         # Fix Heroku connection string
         self.database_url = os.getenv("DATABASE_URL")
