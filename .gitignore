@@ -3,9 +3,10 @@
 .env*
 
 # Directories
-data
-__pycache__
-certs
-secrets
-.vscode
-.utility/
+data/
+__pycache__/
+certs/
+secrets/
+.vscode/
+.claude/
+.gemini/
