@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 from enum import Enum
 from typing import Optional, List, Union
+from urllib.parse import urlparse
 
 
 class Table(Enum):
@@ -60,6 +61,25 @@ class Database:
         self.ssl_mode = "require" if ENVIRONMENT == "prod" else "disable"
         self.environment = ENVIRONMENT
         self.conn = None
+        
+        # Parse the database URL to extract components
+        parsed_url = urlparse(self.database_url)
+        db_host = parsed_url.hostname
+        db_port = parsed_url.port
+        db_user = parsed_url.username
+        db_name = parsed_url.path.lstrip('/')
+
+        # Print configuration
+        print("--- Database Configuration ---")
+        print(f"  Environment: {self.environment.upper()}")
+        print(f"  Host: {db_host}")
+        print(f"  Port: {db_port}")
+        print(f"  User: {db_user}")
+        print(f"  Database: {db_name}")
+        print(f"  SSL Mode: {self.ssl_mode}")
+        print("-----------------------------")
+        print()
+        
         self._initialized = True
 
     def connect(self):
@@ -74,12 +94,6 @@ class Database:
             )
 
             self.conn = self.engine.connect()
-
-            print(
-                f"Dashboard running from \033[1m{self.environment}\033[0m environment")
-            print(
-                f"Database connection established via URL: \033[1m{self.conn.engine.url}\033[0m")
-            print()
 
             return self.conn
         except Exception as e:
