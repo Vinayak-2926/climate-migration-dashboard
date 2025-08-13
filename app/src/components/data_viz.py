@@ -157,68 +157,55 @@ def plot_climate_hazards(county_fips, county_name):
 
 def plot_nri_choropleth():
     try:
-        # Load county GeoJSON data
-        with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
-            counties = json.load(response)
-
-        # Get county data and merge with population projections
-        counties_data = database.get_county_metadata()
-        counties_data = counties_data.merge(
-            database.get_population_projections_by_fips(),
-            how='inner',
-            on='county_fips'
-        )
-
+        # Get county data
+        county_data = database.get_county_geometries()
+        
         # Get FEMA risk data
-        fema_df = database.get_stat_var(Table.COUNTY_FEMA_DATA, "fema_nri",
-                                        county_fips=counties_data['county_fips'].tolist(), year=2023)
-
-        # Merge FEMA data with counties data
-        counties_data = counties_data.merge(
-            fema_df, how="inner", on="county_fips")
+        fema_data = database.get_stat_var(Table.COUNTY_FEMA_DATA, "fema_nri",
+                                        county_fips=county_data['county_fips'].tolist(), year=2023).reset_index()
+        
+        # Merge the basic county data with the FEMA NRI data
+        merged_df = pd.merge(fema_data, county_data, on='county_fips', how='left')
 
         # Convert WKT to geometry objects with error handling
-        counties_data['geometry'] = counties_data['geometry_x'].apply(
+        merged_df['geometry'] = merged_df['geometry'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
 
         # Create NRI risk buckets
-        counties_data['nri_bucket'] = pd.cut(
-            counties_data['fema_nri'],
+        merged_df['nri_bucket'] = pd.cut(
+            merged_df['fema_nri'],
             bins=[0, 20, 40, 60, 80, 100],
             include_lowest=True,
             labels=RISK_LEVELS,
             ordered=True
         )
+        
+        # Create GeoDataFrame first (needed for proper GeoSeries)
+        gdf = gpd.GeoDataFrame(merged_df)
 
-        # Extract the state FIPS from county FIPS (first 2 digits)
-        # Ensure it stays as a string
-        counties_data['county_fips'] = counties_data['county_fips'].astype(str)
-        counties_data['state_fips'] = counties_data['county_fips'].str[:2]
+        # Now simplify the geometry (this is a GeoSeries method)
+        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
+
+        # Convert to GeoJSON format for Plotly
+        geojson_data = json.loads(gdf.to_json())
 
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
-            counties_data,
-            geojson=counties,
+            gdf,
+            geojson=geojson_data,
             color='nri_bucket',
             color_discrete_map=RISK_COLOR_MAPPING,
-            locations='county_fips',
+            locations=gdf.index,
             scope="usa",
-            basemap_visible=False,
-            hover_data={
-                'county_name': True,
-                'climate_region': True,
-                'fema_nri': True,
-                'county_fips': False  # Hide FIPS code from hover
-            },
-            custom_data=['county_name', 'climate_region', 'fema_nri'],
+            basemap_visible=True,
+            custom_data=['name', 'fema_nri'],
         )
 
         # Update hover template to format the display nicely
         fig.update_traces(
             showlegend=False,
             hovertemplate='<b>%{customdata[0]}</b><br>' +
-            'Climate Region: %{customdata[1]}<br>' +
-            'FEMA Risk Level: %{customdata[2]:.1f}<br>' +
+            'FEMA Risk Level: %{customdata[1]:.1f}<br>' +
             '<extra></extra>',  # Removes trace name from hover
             marker_line_width=0
         )
