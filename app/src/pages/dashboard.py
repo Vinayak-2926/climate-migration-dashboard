@@ -27,32 +27,32 @@ st.html(
 cmpt.quote_box("Climate change is already profoundly reshaping where Americans reside and where continued habitation is no longer viable. The increasing frequency of wildfires, floods, extreme heat waves, and rising sea levels has already displaced over 3.2 million people in the United States between 2000 and 2020 alone. Projections indicate that by 2070, sea level rise could disrupt the lives of an additional 13 million individuals.")
 cmpt.vertical_spacer(10)
 
-counties = database.get_cbsa_counties(filter="metro").set_index('COUNTY_FIPS')
+counties = database.get_cbsa_counties(filter="metro").set_index('county_fips')
 
-counties = counties[counties["STATE"] != 6]
+counties = counties[counties["state"] != 6]
 
-population_historical = database.get_population_timeseries().set_index('COUNTY_FIPS')
+population_historical = database.get_population_timeseries().set_index('county_fips')
 
 population_projections = database.get_population_projections_by_fips(
-).set_index('COUNTY_FIPS')
+).set_index('county_fips')
 
-selected_county_fips = '36029'
+selected_county_fips = 36029
 
 # Add components to the sidebar
 with st.sidebar:
     selected_county_fips = st.selectbox(
         'Select a county',
         counties.index,
-        format_func=lambda fips: counties['NAME'].loc[fips],
+        format_func=lambda fips: counties['name'].loc[fips],
         placeholder='Type to search...',
         index=counties.index.get_loc(selected_county_fips)
     )
 
     scenario_names = {
-        # "POPULATION_2065_S3": "Baseline",
-        "POPULATION_2065_S5a": "Low",
-        "POPULATION_2065_S5b": "Medium",
-        "POPULATION_2065_S5c": "High"
+        # "population_2065_s3": "Baseline",
+        "population_2065_s5a": "Low",
+        "population_2065_s5b": "Medium",
+        "population_2065_s5c": "High"
     }
 
     selected_scenario = st.selectbox(
@@ -119,7 +119,7 @@ if selected_county_fips:
     county_metadata = database.get_county_metadata(
         selected_county_fips).iloc[0]
     # Separate the county and state names
-    full_name = county_metadata['NAME']
+    full_name = county_metadata['name']
     county_name, state_name = full_name.split(', ')
 else:
     county_name = state_name = selected_county_fips = None

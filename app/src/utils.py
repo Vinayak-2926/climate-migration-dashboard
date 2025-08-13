@@ -15,13 +15,13 @@ def get_all_county_fips():
     # import table containing county names and FIPS
     counties = pd.read_csv(DATA_DIR + "raw/county_names.csv")
 
-    return counties.COUNTY_FIPS
+    return counties.county_fips
 
 def get_county_fips_code(county_name: str) -> str:
     # import table containing county names and FIPS
     counties = pd.read_csv(DATA_DIR + "raw/county_names.csv")
     
-    search_results = counties[counties.COUNTY_NAME == county_name]["COUNTY_FIPS"]
+    search_results = counties[counties.COUNTY_NAME == county_name]["county_fips"]
     
     # If there are no search results return None
     if search_results.empty:

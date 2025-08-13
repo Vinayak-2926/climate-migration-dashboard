@@ -45,7 +45,7 @@ class Database:
 
         # Load environment-specific .env file
         # Default to dev, change to prod when deploying
-        ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
+        ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
         env_file = f".env.{ENVIRONMENT}"
         load_dotenv(env_file, override=True)
 
@@ -110,13 +110,13 @@ class Database:
         try:
             query = "SELECT * FROM county_population_projections"
 
-            # Add COUNTY_FIPS filter if provided
+            # Add county_fips filter if provided
             if county_fips is not None:
                 if isinstance(county_fips, list):
                     fips_list = ", ".join(str(fips) for fips in county_fips)
-                    query += f" WHERE COUNTY_FIPS IN ({fips_list})"
+                    query += f" WHERE county_fips IN ({fips_list})"
                 else:
-                    query += f" WHERE COUNTY_FIPS = {county_fips}"
+                    query += f" WHERE county_fips = {county_fips}"
 
             # Execute query and return as DataFrame
             df = pd.read_sql(query, conn)
@@ -145,13 +145,13 @@ class Database:
         try:
             query = "SELECT * FROM timeseries_population"
 
-            # Add COUNTY_FIPS filter if provided
+            # Add county_fips filter if provided
             if county_fips is not None:
                 if isinstance(county_fips, list):
                     fips_list = ", ".join(str(fips) for fips in county_fips)
-                    query += f" WHERE COUNTY_FIPS IN ({fips_list})"
+                    query += f" WHERE county_fips IN ({fips_list})"
                 else:
-                    query += f" WHERE COUNTY_FIPS = {county_fips}"
+                    query += f" WHERE county_fips = {county_fips}"
 
             # Execute query and return as DataFrame
             df = pd.read_sql(query, conn)
@@ -180,16 +180,16 @@ class Database:
         try:
             query = "SELECT * FROM timeseries_median_gross_rent"
 
-            # Add COUNTY_FIPS filter if provided
+            # Add county_fips filter if provided
             if county_fips is not None:
                 if isinstance(county_fips, list):
                     fips_list = ", ".join(str(fips) for fips in county_fips)
-                    query += f" WHERE \"COUNTY_FIPS\" IN ({fips_list})"
+                    query += f" WHERE \"county_fips\" IN ({fips_list})"
                 else:
-                    query += f" WHERE \"COUNTY_FIPS\" = {county_fips}"
+                    query += f" WHERE \"county_fips\" = {county_fips}"
 
             # Execute query and return as DataFrame
-            df = pd.read_sql(query, conn).set_index("COUNTY_FIPS")
+            df = pd.read_sql(query, conn).set_index("county_fips")
 
             return df.T
         except Exception as e:
@@ -224,30 +224,30 @@ class Database:
             # Initialize parameters dictionary
             params = {}
 
-            # Add COUNTY_FIPS filter if provided
+            # Add county_fips filter if provided
             if county_fips is not None:
                 if isinstance(county_fips, list):
                     # Create base query
-                    query = f'SELECT "YEAR", "{indicator_name}", "COUNTY_FIPS" FROM "{table_name}"'
+                    query = f'SELECT "year", "{indicator_name}", "county_fips" FROM "{table_name}"'
 
                     # For multiple counties
-                    query += " WHERE \"COUNTY_FIPS\" IN :county_fips"
+                    query += " WHERE \"county_fips\" IN :county_fips"
                     params['county_fips'] = tuple(
                         str(fips) for fips in county_fips)
                 else:
                     # Create base query
-                    query = f'SELECT "YEAR", "{indicator_name}" FROM "{table_name}"'
+                    query = f'SELECT "year", "{indicator_name}" FROM "{table_name}"'
 
                     # For single county
-                    query += " WHERE \"COUNTY_FIPS\" = :county_fips"
+                    query += " WHERE \"county_fips\" = :county_fips"
                     params['county_fips'] = str(county_fips)
 
                 if year:
-                    query += f' AND "YEAR" = :year'
+                    query += f' AND "year" = :year'
                     params['year'] = year
 
             # Sort the results of the query
-            query += f" ORDER BY \"{table_name}\".\"YEAR\" ASC"
+            query += f" ORDER BY \"{table_name}\".\"year\" ASC"
 
             # Convert to SQLAlchemy text object
             sql_query = text(query)
@@ -255,8 +255,8 @@ class Database:
             # Execute query and return as DataFrame
             df = pd.read_sql(sql_query, conn, params=params)
 
-            df.YEAR = pd.to_datetime(df.YEAR, format='%Y').dt.year
-            df = df.set_index("YEAR")
+            df.year = pd.to_datetime(df.year, format='%Y').dt.year
+            df = df.set_index("year")
 
             return df
         except Exception as e:
@@ -283,19 +283,19 @@ class Database:
             # Start with the base query
             query = f"SELECT * FROM {Table.COUNTY_METADATA.value}"
 
-            # Add COUNTY_FIPS filter if provided
+            # Add county_fips filter if provided
             if county_fips is not None:
                 if isinstance(county_fips, list):
                     # Create proper parameter placeholders for IN clause
                     placeholders = ", ".join(
                         f":fips_{i}" for i in range(len(county_fips)))
-                    query += f" WHERE \"COUNTY_FIPS\" IN ({placeholders})"
+                    query += f" WHERE \"county_fips\" IN ({placeholders})"
 
                     # Create a dictionary of parameters
                     params = {f"fips_{i}": fips for i,
                               fips in enumerate(county_fips)}
                 else:
-                    query += " WHERE \"COUNTY_FIPS\" = :county_fips"
+                    query += " WHERE \"county_fips\" = :county_fips"
                     params = {'county_fips': county_fips}
             else:
                 params = {}
@@ -330,23 +330,23 @@ class Database:
         """
         conn = _self.conn
         try:
-            # Base query with JOIN to get metadata for matching COUNTY_FIPS
+            # Base query with JOIN to get metadata for matching county_fips
             query = f'''
                 SELECT 
-                    cbsa."CBSA", 
-                    cbsa."TYPE",
+                    cbsa."cbsa", 
+                    cbsa."type",
                     meta.*
                 FROM {Table.COUNTY_CBSA_DATA.value} cbsa
                 JOIN {Table.COUNTY_METADATA.value} meta
-                ON cbsa."COUNTY_FIPS" = meta."COUNTY_FIPS"
+                ON cbsa."county_fips" = meta."county_fips"
             '''
 
             # Apply filter if provided
             if filter is not None and isinstance(filter, str):
                 if filter == 'metro':
-                    query += f" WHERE cbsa.\"TYPE\" = 'Metropolitan Statistical Area'"
+                    query += f" WHERE cbsa.\"type\" = 'Metropolitan Statistical Area'"
                 elif filter == 'micro':
-                    query += f" WHERE cbsa.\"TYPE\" = 'Micropolitan Statistical Area'"
+                    query += f" WHERE cbsa.\"type\" = 'Micropolitan Statistical Area'"
 
             # Execute query and return as DataFrame
             df = pd.read_sql(query, conn)
@@ -374,7 +374,7 @@ class Database:
         conn = _self.conn
         try:
             query = text(
-                "SELECT * FROM projected_socioeconomic_indices WHERE \"COUNTY_FIPS\" = :county_fips")
+                "SELECT * FROM projected_socioeconomic_indices WHERE \"county_fips\" = :county_fips")
 
             # Execute query with parameter
             df = pd.read_sql(query, conn, params={'county_fips': county_fips})
@@ -405,7 +405,7 @@ class Database:
         conn = _self.conn
         try:
             query = text(
-                f"SELECT * FROM {table.value} WHERE \"COUNTY_FIPS\" = :county_fips")
+                f"SELECT * FROM {table.value} WHERE \"county_fips\" = :county_fips")
 
             # Execute query with parameter
             df = pd.read_sql(query, conn, params={'county_fips': county_fips})
@@ -423,9 +423,9 @@ class Database:
         conn = _self.conn
         try:
             query = text(
-                'SELECT "SCENARIO", "z_STUDENT_TEACHER_RATIO", "z_AVAILABLE_HOUSING_UNITS", "z_UNEMPLOYMENT_RATE" '
+                'SELECT "scenario", "z_student_teacher_ratio", "z_available_housing_units", "z_unemployment_rate" '
                 f'FROM {Table.COUNTY_COMBINED_PROJECTIONS.value} '
-                'WHERE "COUNTY_FIPS" = :county_fips'
+                'WHERE "county_fips" = :county_fips'
             )
             
             # Execute query with parameter
@@ -436,7 +436,7 @@ class Database:
             
             scenario_id = scenario.split("_")[-1]
             
-            df = df[df["SCENARIO"] == scenario_id]
+            df = df[df["scenario"] == scenario_id]
 
             return df.iloc[0]
         except Exception as e:
@@ -455,7 +455,7 @@ class Database:
     @st.cache_data
     def get_county_geometries(_self):
         try:
-            query = text('SELECT "COUNTY_FIPS", "NAME", "GEOMETRY" FROM '
+            query = text('SELECT "county_fips", "name", "geometry" FROM '
                          f'{Table.COUNTY_METADATA.value}')
             
             df = pd.read_sql(query, _self.engine)
