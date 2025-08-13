@@ -74,10 +74,10 @@ def get_risk_color(score, opacity=1.0):
 
 def plot_nri_score(county_fips):
     fema_df = database.get_stat_var(
-        Table.COUNTY_FEMA_DATA, "FEMA_NRI", county_fips, 2023)
+        Table.COUNTY_FEMA_DATA, "fema_nri", county_fips, 2023)
 
     # Dummy NRI data for demonstration
-    nri_score = fema_df["FEMA_NRI"].iloc[0]
+    nri_score = fema_df["fema_nri"].iloc[0]
 
     # Use light gray for the gauge bar
     bar_color = "rgba(255, 255, 255, 0.5)"
@@ -166,24 +166,24 @@ def plot_nri_choropleth():
         counties_data = counties_data.merge(
             database.get_population_projections_by_fips(),
             how='inner',
-            on='COUNTY_FIPS'
+            on='county_fips'
         )
 
         # Get FEMA risk data
-        fema_df = database.get_stat_var(Table.COUNTY_FEMA_DATA, "FEMA_NRI",
-                                        county_fips=counties_data['COUNTY_FIPS'].tolist(), year=2023)
+        fema_df = database.get_stat_var(Table.COUNTY_FEMA_DATA, "fema_nri",
+                                        county_fips=counties_data['county_fips'].tolist(), year=2023)
 
         # Merge FEMA data with counties data
         counties_data = counties_data.merge(
-            fema_df, how="inner", on="COUNTY_FIPS")
+            fema_df, how="inner", on="county_fips")
 
         # Convert WKT to geometry objects with error handling
-        counties_data['geometry'] = counties_data['GEOMETRY'].apply(
+        counties_data['geometry'] = counties_data['geometry_x'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
 
         # Create NRI risk buckets
-        counties_data['NRI_BUCKET'] = pd.cut(
-            counties_data['FEMA_NRI'],
+        counties_data['nri_bucket'] = pd.cut(
+            counties_data['fema_nri'],
             bins=[0, 20, 40, 60, 80, 100],
             include_lowest=True,
             labels=RISK_LEVELS,
@@ -192,24 +192,25 @@ def plot_nri_choropleth():
 
         # Extract the state FIPS from county FIPS (first 2 digits)
         # Ensure it stays as a string
-        counties_data['STATE_FIPS'] = counties_data['COUNTY_FIPS'].str[:2]
+        counties_data['county_fips'] = counties_data['county_fips'].astype(str)
+        counties_data['state_fips'] = counties_data['county_fips'].str[:2]
 
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
             counties_data,
             geojson=counties,
-            color='NRI_BUCKET',
+            color='nri_bucket',
             color_discrete_map=RISK_COLOR_MAPPING,
-            locations='COUNTY_FIPS',
+            locations='county_fips',
             scope="usa",
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME': True,
-                'CLIMATE_REGION': True,
-                'FEMA_NRI': True,
-                'COUNTY_FIPS': False  # Hide FIPS code from hover
+                'county_name': True,
+                'climate_region': True,
+                'fema_nri': True,
+                'county_fips': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI'],
+            custom_data=['county_name', 'climate_region', 'fema_nri'],
         )
 
         # Update hover template to format the display nicely
@@ -290,10 +291,10 @@ def receiver_places_choropleth():
         
         county_data = database.get_county_geometries()
         
-        merged_df = pd.merge(receiver_places_data, county_data, on='COUNTY_FIPS', how='left')
+        merged_df = pd.merge(receiver_places_data, county_data, on='county_fips', how='left')
 
         # Convert WKT to geometry objects with error handling
-        merged_df['geometry'] = merged_df['GEOMETRY'].apply(
+        merged_df['geometry'] = merged_df['geometry'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
 
         # Create GeoDataFrame first (needed for proper GeoSeries)
@@ -324,7 +325,7 @@ def receiver_places_choropleth():
                 'is_receiving_county': 'Receiving County'
             },
             hover_data={
-                'NAME': True,
+                'name': True,
                 'is_receiving_county': True,
             },
             title="Climate Migration Receiver Places"
@@ -415,49 +416,50 @@ def population_by_climate_region(scenario):
         counties_data = counties_data.merge(
             database.get_population_projections_by_fips(),
             how='inner',
-            on='COUNTY_FIPS'
+            on='county_fips'
         )
 
         # Convert WKT to geometry objects
-        counties_data['geometry'] = counties_data['GEOMETRY'].apply(wkt.loads)
+        counties_data['geometry'] = counties_data['geometry_x'].apply(wkt.loads)
 
         # Get centroids of geometries for marker placement
-        counties_data['CENTROID_LON'] = counties_data['geometry'].apply(
+        counties_data['centroid_lon'] = counties_data['geometry'].apply(
             lambda geom: geom.centroid.x)
-        counties_data['CENTROID_LAT'] = counties_data['geometry'].apply(
+        counties_data['centroid_lat'] = counties_data['geometry'].apply(
             lambda geom: geom.centroid.y)
 
         # Calculate variation between scenario and baseline
-        counties_data['VARIATION'] = counties_data[scenario] - \
-            counties_data['POPULATION_2065_S3']
+        counties_data['variation'] = counties_data[scenario] - \
+            counties_data['population_2065_s3']
 
         # Percentage difference
-        counties_data['VARIATION_PCT'] = ((counties_data[scenario] - counties_data['POPULATION_2065_S3']) /
-                                          counties_data['POPULATION_2065_S3']) * 100
+        counties_data['variation_pct'] = ((counties_data[scenario] - counties_data['population_2065_s3']) /
+                                          counties_data['population_2065_s3']) * 100
 
         # Convert to GeoDataFrame for spatial operations
         counties_data = gpd.GeoDataFrame(counties_data)
 
         # Extract the state FIPS from county FIPS (first 2 digits)
-        counties_data['STATE_FIPS'] = counties_data['COUNTY_FIPS'].str[:2]
+        counties_data['county_fips'] = counties_data['county_fips'].astype(str)
+        counties_data['state_fips'] = counties_data['county_fips'].str[:2]
 
         # Check if CLIMATE_REGION exists in the dataframe
-        if 'CLIMATE_REGION' not in counties_data.columns:
+        if 'climate_region' not in counties_data.columns:
             st.error("Climate region data not available")
             return None
 
         # For each state, determine the dominant climate region by most common value
-        state_climate_regions = counties_data.groupby('STATE_FIPS')['CLIMATE_REGION'].agg(
+        state_climate_regions = counties_data.groupby('state_fips')['climate_region'].agg(
             lambda x: x.value_counts().index[0] if len(x) > 0 else None
         ).reset_index()
 
         # Remove any rows where CLIMATE_REGION is None
-        state_climate_regions = state_climate_regions[state_climate_regions['CLIMATE_REGION'].notna(
+        state_climate_regions = state_climate_regions[state_climate_regions['climate_region'].notna(
         )]
 
         # Create a dictionary to map state FIPS to climate regions
-        state_region_dict = dict(zip(state_climate_regions['STATE_FIPS'],
-                                     state_climate_regions['CLIMATE_REGION']))
+        state_region_dict = dict(zip(state_climate_regions['state_fips'],
+                                     state_climate_regions['climate_region']))
 
         # Create a list to store modified features
         modified_features = []
@@ -473,7 +475,7 @@ def population_by_climate_region(scenario):
                 if 'properties' not in feature:
                     feature['properties'] = {}
 
-                feature['properties']['CLIMATE_REGION'] = state_region_dict[state_fips]
+                feature['properties']['climate_region'] = state_region_dict[state_fips]
                 modified_features.append(feature)
 
         # Create a GeoDataFrame from the modified features
@@ -484,7 +486,7 @@ def population_by_climate_region(scenario):
             states_gdf['id'] = states_gdf['id'].astype(str)
 
         # Dissolve states by climate region
-        climate_regions_gdf = states_gdf.dissolve(by='CLIMATE_REGION')
+        climate_regions_gdf = states_gdf.dissolve(by='climate_region')
 
         # Clean up geometries to remove internal boundaries
         for idx, row in climate_regions_gdf.iterrows():
@@ -497,36 +499,36 @@ def population_by_climate_region(scenario):
 
         # Find the maximum absolute percentage change for symmetric color scale
         max_abs_pct_change = max(
-            abs(counties_data['VARIATION_PCT'].min()),
-            abs(counties_data['VARIATION_PCT'].max())
+            abs(counties_data['variation_pct'].min()),
+            abs(counties_data['variation_pct'].max())
         )
 
         # Create choropleth base layer with county population data
         fig = px.choropleth(
             counties_data,
             geojson=counties,
-            color='VARIATION_PCT',
+            color='variation_pct',
             color_continuous_scale=DIVERGING_RGB,  # Red-Blue diverging scale
             range_color=[-max_abs_pct_change,
                          max_abs_pct_change],  # Symmetric scale
-            locations='COUNTY_FIPS',
+            locations='county_fips',
             scope="usa",
             labels={
-                'COUNTY_NAME': 'County',
-                'CLIMATE_REGION': 'Climate Region',
+                'county_name': 'County',
+                'climate_region': 'Climate Region',
                 scenario: 'Population (2065)',
-                'VARIATION_PCT': 'Population Change (%)'
+                'variation_pct': 'Population Change (%)'
             },
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME': True,
-                'CLIMATE_REGION': True,
+                'county_name': True,
+                'climate_region': True,
                 scenario: True,
-                'VARIATION_PCT': ':.2f',
-                'COUNTY_FIPS': False  # Hide FIPS code from hover
+                'variation_pct': ':.2f',
+                'county_fips': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME', 'CLIMATE_REGION',
-                         scenario, 'VARIATION_PCT']
+            custom_data=['county_name', 'climate_region',
+                         scenario, 'variation_pct']
         )
 
         # Update hover template to format the display nicely
@@ -572,9 +574,9 @@ def population_by_climate_region(scenario):
 
         # Impact labels based on the human-readable scenario parameter
         scenario_labels = {
-            'POPULATION_2065_S5a': 'Low Impact Climate Migration',
-            'POPULATION_2065_S5b': 'Medium Impact Climate Migration',
-            'POPULATION_2065_S5c': 'High Impact Climate Migration'
+            'population_2065_s5a': 'Low Impact Climate Migration',
+            'population_2065_s5b': 'Medium Impact Climate Migration',
+            'population_2065_s5c': 'High Impact Climate Migration'
         }
 
         scenario_title = scenario_labels.get(scenario, scenario)
@@ -802,7 +804,7 @@ def display_migration_impact_analysis(projections_dict, scenario):
     }
 
     # Calculate metrics based on selected scenario vs baseline
-    baseline_pop_2065 = projections_dict["POPULATION_2065_S3"]
+    baseline_pop_2065 = projections_dict["population_2065_s3"]
     selected_pop_2065 = projections_dict[scenario]
 
     # Calculate additional residents (difference between selected scenario and baseline)
@@ -949,7 +951,7 @@ def display_scenario_impact_analysis(county_name, state_name, projected_data):
 
         # Add interpretation based on the data
         unemployment_above_threshold = any(
-            100 - row['TOTAL_EMPLOYED_PERCENTAGE'] > 4.0 for _, row in projected_data.iterrows())
+            100 - row['total_employed_percentage'] > 4.0 for _, row in projected_data.iterrows())
 
         if unemployment_above_threshold:
             st.warning(
@@ -971,8 +973,8 @@ def display_scenario_impact_analysis(county_name, state_name, projected_data):
         st.plotly_chart(education_chart, use_container_width=True)
 
         # Add interpretation based on the data
-        high_ratio_scenarios = [row['SCENARIO'] for _, row in projected_data.iterrows(
-        ) if row['STUDENT_TEACHER_RATIO'] > 16.0]
+        high_ratio_scenarios = [row['scenario'] for _, row in projected_data.iterrows(
+        ) if row['student_teacher_ratio'] > 16.0]
 
         if high_ratio_scenarios:
             st.warning(
@@ -995,43 +997,43 @@ def display_scenario_impact_analysis(county_name, state_name, projected_data):
 
         # Calculate and add interpretation
         for _, row in projected_data.iterrows():
-            occupancy_rate = (row['OCCUPIED_HOUSING_UNITS'] / (
-                row['OCCUPIED_HOUSING_UNITS'] + row['AVAILABLE_HOUSING_UNITS'])) * 100
+            occupancy_rate = (row['occupied_housing_units'] / (
+                row['occupied_housing_units'] + row['available_housing_units'])) * 100
             vacancy_rate = 100 - occupancy_rate
 
             if vacancy_rate < 5:
                 st.warning(
-                    f"In the {row['SCENARIO']} scenario, the vacancy rate is below 5%, indicating a potential housing shortage.")
+                    f"In the {row['scenario']} scenario, the vacancy rate is below 5%, indicating a potential housing shortage.")
             elif vacancy_rate > 8:
                 st.info(
-                    f"In the {row['SCENARIO']} scenario, the vacancy rate is above 8%, suggesting potential excess housing capacity.")
+                    f"In the {row['scenario']} scenario, the vacancy rate is above 8%, suggesting potential excess housing capacity.")
 
 
 def create_housing_chart(projected_data):
     # Make a copy of the dataframe to avoid modifying the original
     df = projected_data.copy()
 
-    # Sort the dataframe by SCENARIO
-    df = df.sort_values('SCENARIO')
+    # Sort the dataframe by scenario
+    df = df.sort_values('scenario')
 
     # Get the max absolute value for symmetric axis
-    max_value = max(abs(df['AVAILABLE_HOUSING_UNITS'].max()),
-                    abs(df['AVAILABLE_HOUSING_UNITS'].min()))
+    max_value = max(abs(df['available_housing_units'].max()),
+                    abs(df['available_housing_units'].min()))
 
     # Calculate housing metrics if not already in the dataframe
-    if 'HOUSING_OCCUPANCY_RATE' not in df.columns:
-        df['HOUSING_OCCUPANCY_RATE'] = (df['OCCUPIED_HOUSING_UNITS'] / (
-            df['OCCUPIED_HOUSING_UNITS'] + df['AVAILABLE_HOUSING_UNITS'])) * 100
+    if 'housing_occupancy_rate' not in df.columns:
+        df['housing_occupancy_rate'] = (df['occupied_housing_units'] / (
+            df['occupied_housing_units'] + df['available_housing_units'])) * 100
 
     # Create the horizontal bar chart
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        y=df['SCENARIO'],
-        x=df['AVAILABLE_HOUSING_UNITS'],
+        y=df['scenario'],
+        x=df['available_housing_units'],
         orientation='h',
         marker=dict(
-            color=df['AVAILABLE_HOUSING_UNITS'].apply(
+            color=df['available_housing_units'].apply(
                 lambda x: DIVERGING_RGB[3] if x < 0 else DIVERGING_RGB[0]),
         )
     ))
@@ -1071,8 +1073,8 @@ def create_student_teacher_chart(projected_data):
     # Make a copy of the dataframe to avoid modifying the original
     df = projected_data.copy()
 
-    # Sort the dataframe by SCENARIO
-    df = df.sort_values('SCENARIO')
+    # Sort the dataframe by scenario
+    df = df.sort_values('scenario')
 
     # Create figure
     fig = go.Figure()
@@ -1083,15 +1085,15 @@ def create_student_teacher_chart(projected_data):
     # Add bar for each scenario
     fig.add_trace(
         go.Bar(
-            x=df['SCENARIO'],
-            y=df['STUDENT_TEACHER_RATIO'],
+            x=df['scenario'],
+            y=df['student_teacher_ratio'],
             marker=dict(
                 color=[
                     DIVERGING_RGB[3] if ratio > optimal_ratio else DIVERGING_RGB[0]
-                    for ratio in df['STUDENT_TEACHER_RATIO']
+                    for ratio in df['student_teacher_ratio']
                 ]
             ),
-            text=[f"{ratio:.1f}" for ratio in df['STUDENT_TEACHER_RATIO']],
+            text=[f"{ratio:.1f}" for ratio in df['student_teacher_ratio']],
             textposition='auto',
             hovertemplate='Student-Teacher Ratio: %{y:.1f}<extra></extra>'
         )
@@ -1129,11 +1131,11 @@ def create_student_teacher_chart(projected_data):
             title='Scenario',
             tickmode='array',
             tickvals=list(range(len(df))),
-            ticktext=df['SCENARIO']
+            ticktext=df['scenario']
         ),
         yaxis=dict(
             title='Student-Teacher Ratio',
-            range=[0, max(df['STUDENT_TEACHER_RATIO'])
+            range=[0, max(df['student_teacher_ratio'])
                    * 1.2]  # Add some padding
         ),
         margin=dict(l=50, r=50, t=80, b=50),
@@ -1152,10 +1154,10 @@ def create_employment_chart(projected_data):
     df = projected_data.copy()
 
     # Calculate the unemployed percentage for each scenario
-    df['UNEMPLOYED_PERCENTAGE'] = 100 - df['TOTAL_EMPLOYED_PERCENTAGE']
+    df['unemployed_percentage'] = 100 - df['total_employed_percentage']
 
-    # Sort the dataframe by SCENARIO
-    df = df.sort_values('SCENARIO', ascending=False)
+    # Sort the dataframe by scenario
+    df = df.sort_values('scenario', ascending=False)
 
     # Define the NAIRU threshold
     nairu_threshold = 4.0
@@ -1166,21 +1168,21 @@ def create_employment_chart(projected_data):
     # Add traces for employed and unemployed percentages
     for index, row in df.iterrows():
         # Determine color for unemployed percentage bar
-        unemployed_color = DIVERGING_RGB[3] if row['UNEMPLOYED_PERCENTAGE'] > nairu_threshold else DIVERGING_RGB[2]
+        unemployed_color = DIVERGING_RGB[3] if row['unemployed_percentage'] > nairu_threshold else DIVERGING_RGB[2]
 
         # Add employed percentage bar
         fig.add_trace(
             go.Bar(
                 name='Employed',
-                y=[row['SCENARIO']],
-                x=[row['TOTAL_EMPLOYED_PERCENTAGE']],
+                y=[row['scenario']],
+                x=[row['total_employed_percentage']],
                 orientation='h',
                 marker=dict(color=DIVERGING_RGB[0]),
-                text=[format_percentage(row['TOTAL_EMPLOYED_PERCENTAGE'])],
+                text=[format_percentage(row['total_employed_percentage'])],
                 textposition='inside',
                 hoverinfo='text',
                 hovertext=[
-                    f"Employed: {format_percentage(row['TOTAL_EMPLOYED_PERCENTAGE'])}"],
+                    f"Employed: {format_percentage(row['total_employed_percentage'])}"],
                 showlegend=index == 0  # Only show in legend for the first entry
             )
         )
@@ -1189,15 +1191,15 @@ def create_employment_chart(projected_data):
         fig.add_trace(
             go.Bar(
                 name='Unemployed',
-                y=[row['SCENARIO']],
-                x=[row['UNEMPLOYED_PERCENTAGE']],
+                y=[row['scenario']],
+                x=[row['unemployed_percentage']],
                 orientation='h',
                 marker=dict(color=unemployed_color),
-                text=[format_percentage(row['UNEMPLOYED_PERCENTAGE'])],
+                text=[format_percentage(row['unemployed_percentage'])],
                 textposition='inside',
                 hoverinfo='text',
                 hovertext=[
-                    f"Unemployed: {format_percentage(row['UNEMPLOYED_PERCENTAGE'])}"],
+                    f"Unemployed: {format_percentage(row['unemployed_percentage'])}"],
                 showlegend=index == 0  # Only show in legend for the first entry
             )
         )
@@ -1207,7 +1209,7 @@ def create_employment_chart(projected_data):
         go.Scatter(
             name='NAIRU Threshold (4%)',
             x=[nairu_threshold],
-            y=df['SCENARIO'],
+            y=df['scenario'],
             mode='lines',
             line=dict(color='gray', width=2, dash='dash'),
             opacity=0.8,
@@ -1231,7 +1233,7 @@ def create_employment_chart(projected_data):
         yaxis=dict(
             title='Scenario',
             categoryorder='array',
-            categoryarray=df['SCENARIO'].tolist()
+            categoryarray=df['scenario'].tolist()
         ),
         legend=dict(
             orientation='h',
@@ -1263,49 +1265,49 @@ def generate_policy_recommendations(projected_data):
 
     # Check employment metrics
     for _, row in projected_data.iterrows():
-        unemployment_rate = 100 - row['TOTAL_EMPLOYED_PERCENTAGE']
-        if unemployment_rate > 4.0 and row['SCENARIO'] in ['S5b', 'S5c']:
+        unemployment_rate = 100 - row['total_employed_percentage']
+        if unemployment_rate > 4.0 and row['scenario'] in ['S5b', 'S5c']:
             recommendations.append({
                 'category': 'Employment',
-                'scenario': row['SCENARIO'],
+                'scenario': row['scenario'],
                 'issue': f"Projected unemployment rate of {unemployment_rate:.1f}% exceeds optimal levels",
                 'recommendation': "Consider workforce development programs and economic incentives to attract industries likely to thrive in changing climate conditions."
             })
 
     # Check education metrics
     for _, row in projected_data.iterrows():
-        if row['STUDENT_TEACHER_RATIO'] > 16.0 and row['SCENARIO'] in ['S5b', 'S5c']:
+        if row['student_teacher_ratio'] > 16.0 and row['scenario'] in ['S5b', 'S5c']:
             recommendations.append({
                 'category': 'Education',
-                'scenario': row['SCENARIO'],
-                'issue': f"Student-teacher ratio of {row['STUDENT_TEACHER_RATIO']:.1f} exceeds national average",
+                'scenario': row['scenario'],
+                'issue': f"Student-teacher ratio of {row['student_teacher_ratio']:.1f} exceeds national average",
                 'recommendation': "Plan for educational infrastructure expansion and teacher recruitment to maintain educational quality with population growth."
             })
 
     # Check housing metrics
     for _, row in projected_data.iterrows():
-        occupancy_rate = (row['OCCUPIED_HOUSING_UNITS'] / (
-            row['OCCUPIED_HOUSING_UNITS'] + row['AVAILABLE_HOUSING_UNITS'])) * 100
+        occupancy_rate = (row['occupied_housing_units'] / (
+            row['occupied_housing_units'] + row['available_housing_units'])) * 100
         vacancy_rate = 100 - occupancy_rate
 
-        if vacancy_rate <= 0 and row['SCENARIO'] in ['S5b', 'S5c']:
+        if vacancy_rate <= 0 and row['scenario'] in ['S5b', 'S5c']:
             recommendations.append({
                 'category': 'Housing',
-                'scenario': row['SCENARIO'],
+                'scenario': row['scenario'],
                 'issue': f"Negative vacancy rate of {vacancy_rate:.1f}% indicates a shortage of housing.",
                 'recommendation': "Implement zoning reforms and incentives for affordable housing development to accommodate projected population growth."
             })
-        elif vacancy_rate < 5 and row['SCENARIO'] in ['S5b', 'S5c']:
+        elif vacancy_rate < 5 and row['scenario'] in ['S5b', 'S5c']:
             recommendations.append({
                 'category': 'Housing',
-                'scenario': row['SCENARIO'],
+                'scenario': row['scenario'],
                 'issue': f"Low vacancy rate of {vacancy_rate:.1f}% indicates potential housing shortage",
                 'recommendation': "Implement zoning reforms and incentives for affordable housing development to accommodate projected population growth."
             })
-        elif vacancy_rate > 8 and row['SCENARIO'] in ['S5b', 'S5c']:
+        elif vacancy_rate > 8 and row['scenario'] in ['S5b', 'S5c']:
             recommendations.append({
                 'category': 'Housing',
-                'scenario': row['SCENARIO'],
+                'scenario': row['scenario'],
                 'issue': f"High vacancy rate of {vacancy_rate:.1f}% indicates potential housing surplus",
                 'recommendation': "Consider adaptive reuse strategies for vacant properties and focus on maintaining existing housing stock quality."
             })
@@ -1343,10 +1345,10 @@ def display_population_projections(county_name, state_name, county_fips, populat
 
     # TODO: Rewrite to work with any number of scenarios that are included in the projections
     scenarios = [
-        'POPULATION_2065_S3',
-        'POPULATION_2065_S5b',
-        'POPULATION_2065_S5a',
-        'POPULATION_2065_S5c',
+        'population_2065_s3',
+        'population_2065_s5b',
+        'population_2065_s5a',
+        'population_2065_s5c',
     ]
 
     scenario_labels = [
@@ -1377,8 +1379,8 @@ def display_population_projections(county_name, state_name, county_fips, populat
 
     projection_df = pd.DataFrame(projections_dict)
 
-    # Drop the COUNTY_FIPS column which would otherwise be included as a datapoint on the x-axis
-    projection_df = projection_df.drop(index='COUNTY_FIPS')
+    # Drop the county_fips column which would otherwise be included as a datapoint on the x-axis
+    projection_df = projection_df.drop(index='county_fips')
     projection_df = projection_df.set_index(
         pd.to_datetime(projection_df.index, format='%Y'))
 
@@ -1401,18 +1403,18 @@ def display_housing_indicators(county_name, state_name, county_fips):
 def display_housing_burden_plot(county_name, state_name, county_fips):
     rent_df = database.get_stat_var(
         table=Table.COUNTY_HOUSING_DATA,
-        indicator_name="MEDIAN_GROSS_RENT",
+        indicator_name="median_gross_rent",
         county_fips=county_fips
     )
 
     try:
         income_df = database.get_stat_var(
             table=Table.COUNTY_ECONOMIC_DATA,
-            indicator_name="MEDIAN_INCOME",
+            indicator_name="median_income",
             county_fips=county_fips
         )
     except AttributeError:
-        st.error("Could not retrieve Median Income data. Please ensure 'COUNTY_ECONOMIC_DATA' table and 'MEDIAN_INCOME' variable exist and are accessible.")
+        st.error("Could not retrieve Median Income data. Please ensure 'COUNTY_ECONOMIC_DATA' table and 'median_income' variable exist and are accessible.")
         return
     except Exception as e:
         st.error(f"An error occurred fetching income data: {e}")
@@ -1432,19 +1434,19 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
         return
 
     # Calculation using the renamed columns
-    merged_df['Median_Rent_Burden_Pct'] = (
-        (merged_df['MEDIAN_GROSS_RENT'] * 12) / merged_df['MEDIAN_INCOME']) * 100
+    merged_df['median_rent_burden_pct'] = (
+        (merged_df['median_gross_rent'] * 12) / merged_df['median_income']) * 100
 
-    # Reset index so 'YEAR' becomes a column for Plotly
+    # Reset index so 'year' becomes a column for Plotly
     merged_df.reset_index(inplace=True)
 
-    # Convert the 'YEAR' column to datetime
-    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+    # Convert the 'year' column to datetime
+    merged_df['year'] = pd.to_datetime(merged_df['year'], format='%Y')
 
     fig = px.line(
         merged_df,
-        x='YEAR',  # Use the column name from the index reset
-        y='Median_Rent_Burden_Pct',
+        x='year',  # Use the column name from the index reset
+        y='median_rent_burden_pct',
         title=f'Median Rent Burden Over Time',
     )
 
@@ -1460,8 +1462,8 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
 
     fig.add_shape(
         type="line",
-        x0=merged_df['YEAR'].min(),
-        x1=merged_df['YEAR'].max(),
+        x0=merged_df['year'].min(),
+        x1=merged_df['year'].max(),
         y0=30,
         y1=30,
         line=dict(color=DIVERGING_RGB[3], dash="dash", width=4),
@@ -1470,8 +1472,8 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
 
     fig.add_shape(
         type="line",
-        x0=merged_df['YEAR'].min(),
-        x1=merged_df['YEAR'].max(),
+        x0=merged_df['year'].min(),
+        x1=merged_df['year'].max(),
         y0=50,
         y1=50,
         line=dict(color=DIVERGING_RGB[4], dash="dash", width=4),
@@ -1479,7 +1481,7 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
     )
 
     fig.add_annotation(
-        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        x=merged_df['year'].iloc[-1],  # Use the column name
         y=30,
         text="30% Burden",
         showarrow=False,
@@ -1489,7 +1491,7 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
     )
 
     fig.add_annotation(
-        x=merged_df['YEAR'].iloc[-1],  # Use the column name
+        x=merged_df['year'].iloc[-1],  # Use the column name
         y=50,
         text="50% Burden",
         showarrow=False,
@@ -1504,17 +1506,17 @@ def display_housing_burden_plot(county_name, state_name, county_fips):
 
 
 def display_housing_vacancy_plot(county_name, state_name, county_fips):
-    # Use indicator_name and expect column named "TOTAL_HOUSING_UNITS"
+    # Use indicator_name and expect column named "total_housing_units"
     total_units_df = database.get_stat_var(
         table=Table.COUNTY_HOUSING_DATA,
-        indicator_name="TOTAL_HOUSING_UNITS",
+        indicator_name="total_housing_units",
         county_fips=county_fips
     )
 
-    # Use indicator_name and expect column named "OCCUPIED_HOUSING_UNITS"
+    # Use indicator_name and expect column named "occupied_housing_units"
     occupied_units_df = database.get_stat_var(
         table=Table.COUNTY_HOUSING_DATA,
-        indicator_name="OCCUPIED_HOUSING_UNITS",
+        indicator_name="occupied_housing_units",
         county_fips=county_fips
     )
 
@@ -1527,7 +1529,7 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
     # total_units_df = total_units_df.rename(columns={'Value': 'Total_Units'})
     # occupied_units_df = occupied_units_df.rename(columns={'Value': 'Occupied_Units'})
 
-    # Merge on index (assumed 'YEAR')
+    # Merge on index (assumed 'year')
     merged_df = pd.merge(total_units_df, occupied_units_df,
                          left_index=True, right_index=True, how='inner')
 
@@ -1537,22 +1539,22 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
         return
 
     # Calculate Vacant Units using the direct column names
-    merged_df['Vacant_Units'] = merged_df["TOTAL_HOUSING_UNITS"] - \
-        merged_df["OCCUPIED_HOUSING_UNITS"]
+    merged_df['vacant_units'] = merged_df["total_housing_units"] - \
+        merged_df["occupied_housing_units"]
 
     # Calculate Vacancy Rate Percentage using the direct column name for total
-    merged_df['Vacancy_Rate_Pct'] = (
-        merged_df['Vacant_Units'] / merged_df["TOTAL_HOUSING_UNITS"]) * 100
-    merged_df['Vacancy_Rate_Pct'] = merged_df['Vacancy_Rate_Pct'].replace(
+    merged_df['vacancy_rate_pct'] = (
+        merged_df['vacant_units'] / merged_df["total_housing_units"]) * 100
+    merged_df['vacancy_rate_pct'] = merged_df['vacancy_rate_pct'].replace(
         [float('inf'), float('-inf')], pd.NA).fillna(0)
 
     merged_df.reset_index(inplace=True)
-    merged_df['YEAR'] = pd.to_datetime(merged_df['YEAR'], format='%Y')
+    merged_df['year'] = pd.to_datetime(merged_df['year'], format='%Y')
 
     fig = px.line(
         merged_df,
-        x='YEAR',
-        y='Vacancy_Rate_Pct',
+        x='year',
+        y='vacancy_rate_pct',
         title=f'Housing Vacancy Rate Over Time',
     )
     
@@ -1561,7 +1563,7 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
     )
 
     fig.update_layout(
-        xaxis_title='Year',
+        xaxis_title='year',
         yaxis_title='Vacancy Rate (%)',
         hovermode='x unified'
     )
@@ -1570,15 +1572,15 @@ def display_housing_vacancy_plot(county_name, state_name, county_fips):
     threshold_color = DIVERGING_RGB[3]
     fig.add_shape(
         type="line",
-        x0=merged_df['YEAR'].min(),
-        x1=merged_df['YEAR'].max(),
+        x0=merged_df['year'].min(),
+        x1=merged_df['year'].max(),
         y0=healthy_vacancy_threshold,
         y1=healthy_vacancy_threshold,
         line=dict(color=threshold_color, dash="dash", width=4),
         name=f"{healthy_vacancy_threshold}% Threshold"
     )
     fig.add_annotation(
-        x=merged_df['YEAR'].iloc[-1],
+        x=merged_df['year'].iloc[-1],
         y=healthy_vacancy_threshold,
         text=f"{healthy_vacancy_threshold}% Threshold",
         showarrow=False,
@@ -1606,7 +1608,7 @@ def display_economic_indicators(county_name, state_name, county_fips):
 def display_unemployment_rate(county_name, state_name, county_fips):
     unemployment_df = database.get_stat_var(
         table=Table.COUNTY_ECONOMIC_DATA,
-        indicator_name="UNEMPLOYMENT_RATE",
+        indicator_name="unemployment_rate",
         county_fips=county_fips
     )
 
@@ -1616,13 +1618,13 @@ def display_unemployment_rate(county_name, state_name, county_fips):
         return
 
     unemployment_df.reset_index(inplace=True)
-    unemployment_df['YEAR'] = pd.to_datetime(
-        unemployment_df['YEAR'], format='%Y')
+    unemployment_df['year'] = pd.to_datetime(
+        unemployment_df['year'], format='%Y')
 
     fig = px.line(
         unemployment_df,
-        x='YEAR',
-        y='UNEMPLOYMENT_RATE',
+        x='year',
+        y='unemployment_rate',
         title=f'Unemployment Rate Over Time'
     )
     
@@ -1642,8 +1644,8 @@ def display_unemployment_rate(county_name, state_name, county_fips):
     
     fig.add_shape(
         type="line",
-        x0=unemployment_df['YEAR'].min(),
-        x1=unemployment_df['YEAR'].max(),
+        x0=unemployment_df['year'].min(),
+        x1=unemployment_df['year'].max(),
         y0=healthy_vacancy_threshold,
         y1=healthy_vacancy_threshold,
         line=dict(color=threshold_color, dash="dash", width=2),
@@ -1651,7 +1653,7 @@ def display_unemployment_rate(county_name, state_name, county_fips):
     )
 
     fig.add_annotation(
-        x=unemployment_df['YEAR'].iloc[-1],
+        x=unemployment_df['year'].iloc[-1],
         y=healthy_vacancy_threshold,
         text=f"NAIRU Threshold",
         showarrow=False,
@@ -1669,18 +1671,18 @@ def display_labor_participation(county_name, state_name, county_fips):
     # Fetch data from database
     labor_df = database.get_stat_var(
         table=Table.COUNTY_ECONOMIC_DATA,
-        indicator_name="TOTAL_LABOR_FORCE",
+        indicator_name="total_labor_force",
         county_fips=county_fips
     )
     total_population_df = database.get_stat_var(
         table=Table.COUNTY_ECONOMIC_DATA,
-        indicator_name="POPULATION",
+        indicator_name="population",
         county_fips=county_fips
     )
 
     employed_population_df = database.get_stat_var(
         table=Table.COUNTY_ECONOMIC_DATA,
-        indicator_name="TOTAL_EMPLOYED_POPULATION",
+        indicator_name="total_employed_population",
         county_fips=county_fips
     )
 
@@ -1696,10 +1698,10 @@ def display_labor_participation(county_name, state_name, county_fips):
         return
 
     # Calculate labor force participation rate
-    merged_df['LABOR_FORCE_PARTICIPATION_RATE'] = (
-        merged_df['TOTAL_LABOR_FORCE'] / merged_df['POPULATION']) * 100
+    merged_df['labor_force_participation_rate'] = (
+        merged_df['total_labor_force'] / merged_df['population']) * 100
 
-    # Reset index to make YEAR a column
+    # Reset index to make year a column
     merged_df = merged_df.reset_index()
 
     # Create figure
@@ -1708,8 +1710,8 @@ def display_labor_participation(county_name, state_name, county_fips):
     # Add total population first (as base layer)
     fig.add_trace(
         go.Scatter(
-            x=merged_df['YEAR'],
-            y=merged_df['POPULATION'],
+            x=merged_df['year'],
+            y=merged_df['population'],
             fill='tozeroy',
             mode='lines',
             name='Total Population',
@@ -1721,8 +1723,8 @@ def display_labor_participation(county_name, state_name, county_fips):
     # Add labor force on top
     fig.add_trace(
         go.Scatter(
-            x=merged_df['YEAR'],
-            y=merged_df['TOTAL_LABOR_FORCE'],
+            x=merged_df['year'],
+            y=merged_df['total_labor_force'],
             fill='tozeroy',
             mode='lines',
             name='Labor Force',
@@ -1734,8 +1736,8 @@ def display_labor_participation(county_name, state_name, county_fips):
     # Add labor force on top
     fig.add_trace(
         go.Scatter(
-            x=merged_df['YEAR'],
-            y=merged_df['TOTAL_EMPLOYED_POPULATION'],
+            x=merged_df['year'],
+            y=merged_df['total_employed_population'],
             fill='tozeroy',
             mode='lines',
             name='Employed Population',
@@ -1769,34 +1771,34 @@ def display_education_indicators(county_name, state_name, county_fips):
 
     # Retrieve all the educational attainment data
     less_than_hs_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "LESS_THAN_HIGH_SCHOOL_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "less_than_high_school_total", county_fips=county_fips)
     hs_graduate_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "HIGH_SCHOOL_GRADUATE_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "high_school_graduate_total", county_fips=county_fips)
     some_college_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "SOME_COLLEGE_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "some_college_total", county_fips=county_fips)
     bachelors_higher_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "BACHELORS_OR_HIGHER_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "bachelors_or_higher_total", county_fips=county_fips)
     total_pop_25_64_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "TOTAL_POPULATION_25_64", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "total_population_25_64", county_fips=county_fips)
 
     # Combine all dataframes into one
     final_df = pd.DataFrame()
-    final_df["YEAR"] = less_than_hs_df.index
-    final_df["LESS_THAN_HIGH_SCHOOL_TOTAL"] = less_than_hs_df.values
-    final_df["HIGH_SCHOOL_GRADUATE_TOTAL"] = hs_graduate_df.values
-    final_df["SOME_COLLEGE_TOTAL"] = some_college_df.values
-    final_df["BACHELORS_OR_HIGHER_TOTAL"] = bachelors_higher_df.values
-    final_df["TOTAL_POPULATION_25_64"] = total_pop_25_64_df.values
+    final_df["year"] = less_than_hs_df.index
+    final_df["less_than_high_school_total"] = less_than_hs_df.values
+    final_df["high_school_graduate_total"] = hs_graduate_df.values
+    final_df["some_college_total"] = some_college_df.values
+    final_df["bachelors_or_higher_total"] = bachelors_higher_df.values
+    final_df["total_population_25_64"] = total_pop_25_64_df.values
 
     # Calculate percentages
-    final_df["LessThanHighSchool_Perc"] = (
-        final_df["LESS_THAN_HIGH_SCHOOL_TOTAL"] / final_df["TOTAL_POPULATION_25_64"]) * 100
-    final_df["HighSchoolGraduate_Perc"] = (
-        final_df["HIGH_SCHOOL_GRADUATE_TOTAL"] / final_df["TOTAL_POPULATION_25_64"]) * 100
-    final_df["SomeCollege_Perc"] = (
-        final_df["SOME_COLLEGE_TOTAL"] / final_df["TOTAL_POPULATION_25_64"]) * 100
-    final_df["BachelorsOrHigher_Perc"] = (
-        final_df["BACHELORS_OR_HIGHER_TOTAL"] / final_df["TOTAL_POPULATION_25_64"]) * 100
+    final_df["less_than_high_school_perc"] = (
+        final_df["less_than_high_school_total"] / final_df["total_population_25_64"]) * 100
+    final_df["high_school_graduate_perc"] = (
+        final_df["high_school_graduate_total"] / final_df["total_population_25_64"]) * 100
+    final_df["some_college_perc"] = (
+        final_df["some_college_total"] / final_df["total_population_25_64"]) * 100
+    final_df["bachelors_or_higher_perc"] = (
+        final_df["bachelors_or_higher_total"] / final_df["total_population_25_64"]) * 100
 
     # Create a title for the chart
     st.write(f"### Educational Attainment in {county_name}, {state_name}")
@@ -1818,8 +1820,8 @@ def display_education_indicators(county_name, state_name, county_fips):
     # Bachelor's or Higher (Bottom layer)
     fig.add_trace(
         go.Scatter(
-            x=final_df["YEAR"],
-            y=final_df["BachelorsOrHigher_Perc"],
+            x=final_df["year"],
+            y=final_df["bachelors_or_higher_perc"],
             mode="lines",
             line=dict(width=0.5, color=colors["Bachelor's or Higher"]),
             fill="tozeroy",
@@ -1833,9 +1835,9 @@ def display_education_indicators(county_name, state_name, county_fips):
     # We add the percentages to create proper stacking
     fig.add_trace(
         go.Scatter(
-            x=final_df["YEAR"],
-            y=final_df["BachelorsOrHigher_Perc"] +
-            final_df["SomeCollege_Perc"],
+            x=final_df["year"],
+            y=final_df["bachelors_or_higher_perc"] +
+            final_df["some_college_perc"],
             mode="lines",
             line=dict(width=0.5, color=colors["Some College"]),
             fill="tonexty",
@@ -1848,9 +1850,9 @@ def display_education_indicators(county_name, state_name, county_fips):
     # High School Graduate (Third layer)
     fig.add_trace(
         go.Scatter(
-            x=final_df["YEAR"],
-            y=final_df["BachelorsOrHigher_Perc"] + final_df["SomeCollege_Perc"] +
-            final_df["HighSchoolGraduate_Perc"],
+            x=final_df["year"],
+            y=final_df["bachelors_or_higher_perc"] + final_df["some_college_perc"] +
+            final_df["high_school_graduate_perc"],
             mode="lines",
             line=dict(width=0.5, color=colors["High School Graduate"]),
             fill="tonexty",
@@ -1864,10 +1866,10 @@ def display_education_indicators(county_name, state_name, county_fips):
     # This should add up to 100%
     fig.add_trace(
         go.Scatter(
-            x=final_df["YEAR"],
-            y=final_df["BachelorsOrHigher_Perc"] + final_df["SomeCollege_Perc"] +
-            final_df["HighSchoolGraduate_Perc"] +
-            final_df["LessThanHighSchool_Perc"],
+            x=final_df["year"],
+            y=final_df["bachelors_or_higher_perc"] + final_df["some_college_perc"] +
+            final_df["high_school_graduate_perc"] +
+            final_df["less_than_high_school_perc"],
             mode="lines",
             line=dict(width=0.5, color=colors["Less than High School"]),
             fill="tonexty",
@@ -1915,8 +1917,8 @@ def display_education_indicators(county_name, state_name, county_fips):
         "Note: Data represents educational attainment for the population aged 25-64.")
 
     # Display the latest year's data in a table format
-    latest_year = final_df["YEAR"].max()
-    latest_data = final_df[final_df["YEAR"] == latest_year].iloc[0]
+    latest_year = final_df["year"].max()
+    latest_data = final_df[final_df["year"] == latest_year].iloc[0]
 
     st.write(f"### Latest Educational Attainment ({latest_year})")
 
@@ -1925,21 +1927,21 @@ def display_education_indicators(county_name, state_name, county_fips):
     with col1:
         st.metric(
             "Less than High School",
-            f"{latest_data['LessThanHighSchool_Perc']:.1f}%"
+            f"{latest_data['less_than_high_school_perc']:.1f}%"
         )
         st.metric(
             "High School Graduate",
-            f"{latest_data['HighSchoolGraduate_Perc']:.1f}%"
+            f"{latest_data['high_school_graduate_perc']:.1f}%"
         )
 
     with col2:
         st.metric(
             "Some College or Associate's",
-            f"{latest_data['SomeCollege_Perc']:.1f}%"
+            f"{latest_data['some_college_perc']:.1f}%"
         )
         st.metric(
             "Bachelor's or Higher",
-            f"{latest_data['BachelorsOrHigher_Perc']:.1f}%"
+            f"{latest_data['bachelors_or_higher_perc']:.1f}%"
         )
 
 
@@ -1949,18 +1951,18 @@ def display_unemployment_indicators(county_name, state_name, county_fips):
     # Retrieve the unemployment data needed for the chart
     # Using the same pattern as your education function but with economic data table
     total_labor_force_df = database.get_stat_var(
-        Table.COUNTY_ECONOMIC_DATA, "TOTAL_LABOR_FORCE", county_fips=county_fips)
+        Table.COUNTY_ECONOMIC_DATA, "total_labor_force", county_fips=county_fips)
     unemployed_persons_df = database.get_stat_var(
-        Table.COUNTY_ECONOMIC_DATA, "UNEMPLOYED_PERSONS", county_fips=county_fips)
+        Table.COUNTY_ECONOMIC_DATA, "unemployed_persons", county_fips=county_fips)
     unemployment_rate_df = database.get_stat_var(
-        Table.COUNTY_ECONOMIC_DATA, "UNEMPLOYMENT_RATE", county_fips=county_fips)
+        Table.COUNTY_ECONOMIC_DATA, "unemployment_rate", county_fips=county_fips)
 
     # Combine all dataframes into one
     total_unemployment = pd.DataFrame()
-    total_unemployment["YEAR"] = total_labor_force_df.index
-    total_unemployment["TotalLaborForce"] = total_labor_force_df.values
-    total_unemployment["TotalUnemployed"] = unemployed_persons_df.values
-    total_unemployment["UnemploymentRate"] = unemployment_rate_df.values
+    total_unemployment["year"] = total_labor_force_df.index
+    total_unemployment["total_labor_force"] = total_labor_force_df.values
+    total_unemployment["total_unemployed"] = unemployed_persons_df.values
+    total_unemployment["unemployment_rate"] = unemployment_rate_df.values
 
     # Create a title for the chart
     st.write(
@@ -1971,7 +1973,7 @@ def display_unemployment_indicators(county_name, state_name, county_fips):
 
     # Add trace for Total Labor Force (left y-axis)
     fig.add_trace(
-        go.Scatter(x=total_unemployment["YEAR"], y=total_unemployment["TotalLaborForce"],
+        go.Scatter(x=total_unemployment["year"], y=total_unemployment["total_labor_force"],
                    mode="lines+markers", name="Total Labor Force",
                    line=dict(color="blue"),
                    marker=dict(symbol="circle", color="blue")),
@@ -1980,7 +1982,7 @@ def display_unemployment_indicators(county_name, state_name, county_fips):
 
     # Add trace for Total Unemployed (left y-axis)
     fig.add_trace(
-        go.Scatter(x=total_unemployment["YEAR"], y=total_unemployment["TotalUnemployed"],
+        go.Scatter(x=total_unemployment["year"], y=total_unemployment["total_unemployed"],
                    mode="lines+markers", name="Total Unemployed",
                    line=dict(color="red"),
                    marker=dict(symbol="square", color="red")),
@@ -1989,7 +1991,7 @@ def display_unemployment_indicators(county_name, state_name, county_fips):
 
     # Add trace for Unemployment Rate (right y-axis)
     fig.add_trace(
-        go.Scatter(x=total_unemployment["YEAR"], y=total_unemployment["UnemploymentRate"],
+        go.Scatter(x=total_unemployment["year"], y=total_unemployment["unemployment_rate"],
                    mode="lines+markers", name="Unemployment Rate (%)",
                    line=dict(dash="dash", color="green"),
                    marker=dict(symbol="triangle-up", color="green")),
@@ -1997,7 +1999,7 @@ def display_unemployment_indicators(county_name, state_name, county_fips):
     )
 
     # Set axis titles
-    fig.update_xaxes(title_text="YEAR")
+    fig.update_xaxes(title_text="year")
     fig.update_yaxes(title_text="Number of People", secondary_y=False)
     fig.update_yaxes(title_text="Unemployment Rate (%)",
                      secondary_y=True, color="green")
@@ -2027,58 +2029,58 @@ def display_unemployment_by_education(county_name, state_name, county_fips):
     # Retrieve raw counts for each education level - both unemployed and total population
     # Unemployed counts
     less_than_hs_unemployed_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "LESS_THAN_HIGH_SCHOOL_UNEMPLOYED", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "less_than_high_school_unemployed", county_fips=county_fips)
     hs_graduate_unemployed_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "HIGH_SCHOOL_GRADUATE_UNEMPLOYED", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "high_school_graduate_unemployed", county_fips=county_fips)
     some_college_unemployed_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "SOME_COLLEGE_UNEMPLOYED", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "some_college_unemployed", county_fips=county_fips)
     bachelors_higher_unemployed_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "BACHELORS_OR_HIGHER_UNEMPLOYED", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "bachelors_or_higher_unemployed", county_fips=county_fips)
 
     # Total population counts
     less_than_hs_total_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "LESS_THAN_HIGH_SCHOOL_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "less_than_high_school_total", county_fips=county_fips)
     hs_graduate_total_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "HIGH_SCHOOL_GRADUATE_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "high_school_graduate_total", county_fips=county_fips)
     some_college_total_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "SOME_COLLEGE_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "some_college_total", county_fips=county_fips)
     bachelors_higher_total_df = database.get_stat_var(
-        Table.COUNTY_EDUCATION_DATA, "BACHELORS_OR_HIGHER_TOTAL", county_fips=county_fips)
+        Table.COUNTY_EDUCATION_DATA, "bachelors_or_higher_total", county_fips=county_fips)
 
     # Combine all dataframes into one
     unemployment_by_edulevel = pd.DataFrame()
-    unemployment_by_edulevel["YEAR"] = less_than_hs_unemployed_df.index
+    unemployment_by_edulevel["year"] = less_than_hs_unemployed_df.index
 
     # Store raw counts
-    unemployment_by_edulevel["LessThanHighSchool_Unemployed"] = less_than_hs_unemployed_df.values
-    unemployment_by_edulevel["HighSchoolGraduate_Unemployed"] = hs_graduate_unemployed_df.values
-    unemployment_by_edulevel["SomeCollege_Unemployed"] = some_college_unemployed_df.values
-    unemployment_by_edulevel["BachelorsOrHigher_Unemployed"] = bachelors_higher_unemployed_df.values
+    unemployment_by_edulevel["less_than_high_school_unemployed"] = less_than_hs_unemployed_df.values
+    unemployment_by_edulevel["high_school_graduate_unemployed"] = hs_graduate_unemployed_df.values
+    unemployment_by_edulevel["some_college_unemployed"] = some_college_unemployed_df.values
+    unemployment_by_edulevel["bachelors_or_higher_unemployed"] = bachelors_higher_unemployed_df.values
 
-    unemployment_by_edulevel["LessThanHighSchool_Total"] = less_than_hs_total_df.values
-    unemployment_by_edulevel["HighSchoolGraduate_Total"] = hs_graduate_total_df.values
-    unemployment_by_edulevel["SomeCollege_Total"] = some_college_total_df.values
-    unemployment_by_edulevel["BachelorsOrHigher_Total"] = bachelors_higher_total_df.values
+    unemployment_by_edulevel["less_than_high_school_total"] = less_than_hs_total_df.values
+    unemployment_by_edulevel["high_school_graduate_total"] = hs_graduate_total_df.values
+    unemployment_by_edulevel["some_college_total"] = some_college_total_df.values
+    unemployment_by_edulevel["bachelors_or_higher_total"] = bachelors_higher_total_df.values
 
     # Calculate unemployment rates by dividing unemployed by total population
-    unemployment_by_edulevel["LessThanHighSchool_UnemploymentRate"] = (
-        unemployment_by_edulevel["LessThanHighSchool_Unemployed"] /
-        unemployment_by_edulevel["LessThanHighSchool_Total"] * 100
+    unemployment_by_edulevel["less_than_high_school_unemployment_rate"] = (
+        unemployment_by_edulevel["less_than_high_school_unemployed"] /
+        unemployment_by_edulevel["less_than_high_school_total"] * 100
     )
 
-    unemployment_by_edulevel["HighSchoolGraduate_UnemploymentRate"] = (
-        unemployment_by_edulevel["HighSchoolGraduate_Unemployed"] /
-        unemployment_by_edulevel["HighSchoolGraduate_Total"] * 100
+    unemployment_by_edulevel["high_school_graduate_unemployment_rate"] = (
+        unemployment_by_edulevel["high_school_graduate_unemployed"] /
+        unemployment_by_edulevel["high_school_graduate_total"] * 100
     )
 
-    unemployment_by_edulevel["SomeCollege_UnemploymentRate"] = (
-        unemployment_by_edulevel["SomeCollege_Unemployed"] /
-        unemployment_by_edulevel["SomeCollege_Total"] * 100
+    unemployment_by_edulevel["some_college_unemployment_rate"] = (
+        unemployment_by_edulevel["some_college_unemployed"] /
+        unemployment_by_edulevel["some_college_total"] * 100
     )
 
-    unemployment_by_edulevel["BachelorsOrHigher_UnemploymentRate"] = (
-        unemployment_by_edulevel["BachelorsOrHigher_Unemployed"] /
-        unemployment_by_edulevel["BachelorsOrHigher_Total"] * 100
+    unemployment_by_edulevel["bachelors_or_higher_unemployment_rate"] = (
+        unemployment_by_edulevel["bachelors_or_higher_unemployed"] /
+        unemployment_by_edulevel["bachelors_or_higher_total"] * 100
     )
 
     # Create a title for the chart
@@ -2090,39 +2092,39 @@ def display_unemployment_by_education(county_name, state_name, county_fips):
 
     # Add traces for each education level's unemployment rate
     fig.add_trace(
-        go.Scatter(x=unemployment_by_edulevel["YEAR"],
-                   y=unemployment_by_edulevel["LessThanHighSchool_UnemploymentRate"],
+        go.Scatter(x=unemployment_by_edulevel["year"],
+                   y=unemployment_by_edulevel["less_than_high_school_unemployment_rate"],
                    mode="lines+markers",
                    name="Less Than High School",
                    marker=dict(symbol="circle"))
     )
 
     fig.add_trace(
-        go.Scatter(x=unemployment_by_edulevel["YEAR"],
-                   y=unemployment_by_edulevel["HighSchoolGraduate_UnemploymentRate"],
+        go.Scatter(x=unemployment_by_edulevel["year"],
+                   y=unemployment_by_edulevel["high_school_graduate_unemployment_rate"],
                    mode="lines+markers",
                    name="High School Graduate",
                    marker=dict(symbol="square"))
     )
 
     fig.add_trace(
-        go.Scatter(x=unemployment_by_edulevel["YEAR"],
-                   y=unemployment_by_edulevel["SomeCollege_UnemploymentRate"],
+        go.Scatter(x=unemployment_by_edulevel["year"],
+                   y=unemployment_by_edulevel["some_college_unemployment_rate"],
                    mode="lines+markers",
                    name="Some College or Associate's Degree",
                    marker=dict(symbol="triangle-up"))
     )
 
     fig.add_trace(
-        go.Scatter(x=unemployment_by_edulevel["YEAR"],
-                   y=unemployment_by_edulevel["BachelorsOrHigher_UnemploymentRate"],
+        go.Scatter(x=unemployment_by_edulevel["year"],
+                   y=unemployment_by_edulevel["bachelors_or_higher_unemployment_rate"],
                    mode="lines+markers",
                    name="Bachelor's Degree or Higher",
                    marker=dict(symbol="diamond"))
     )
 
     # Set axis titles and layout
-    fig.update_xaxes(title_text="YEAR")
+    fig.update_xaxes(title_text="year")
     fig.update_yaxes(title_text="Unemployment Rate (%)")
 
     fig.update_layout(
@@ -2153,12 +2155,12 @@ def display_county_indicators(county_fips, scenario):
     # Fetch z-scores for the county (replace with your actual data retrieval)
     scenario_values = database.get_index_projections(county_fips, scenario)
 
-    # indicators_df = indicators_df[indicators_df["COUNTY_FIPS"] == county_fips]
+    # indicators_df = indicators_df[indicators_df["county_fips"] == county_fips]
 
     # Extract z-scores (assuming your database function returns these values)
-    z_student_teacher = scenario_values.get('z_STUDENT_TEACHER_RATIO', 0)
-    z_housing = scenario_values.get('z_AVAILABLE_HOUSING_UNITS', 0)
-    z_unemployment = scenario_values.get('z_UNEMPLOYMENT_RATE', 0)
+    z_student_teacher = scenario_values.get('z_student_teacher_ratio', 0)
+    z_housing = scenario_values.get('z_available_housing_units', 0)
+    z_unemployment = scenario_values.get('z_unemployment_rate', 0)
 
     st.markdown("### Key Performance Indicators")
 
