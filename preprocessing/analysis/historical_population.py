@@ -63,5 +63,7 @@ counties = counties.rename(columns={
     if col.startswith("pop") and col[3:].isdigit()
 })
 
+counties.columns = counties.columns.str.lower()
+
 # Export the population columns indexed by COUNTY_FIPS
 counties.to_csv(DATA_DIR / "processed/cleaned_data/timeseries_population.csv")

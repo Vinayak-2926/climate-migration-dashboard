@@ -257,7 +257,9 @@ def main():
     # us_county_data['COUNTY_FIPS'] = us_county_data['STATE_FIPS'] + \
     #     us_county_data['COUNTY_FIPS']
 
-    us_county_data = us_county_data.set_index("COUNTY_FIPS")
+    us_county_data.columns = us_county_data.columns.str.lower()
+
+    us_county_data = us_county_data.set_index("county_fips")
 
     # Export the final dataset to CSV
     us_county_data.to_csv(OUTPUT_FILE)

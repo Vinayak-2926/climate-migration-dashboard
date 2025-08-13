@@ -3,11 +3,10 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
 # Load environment-specific .env file
-ENVIRONMENT = os.getenv(
-    "ENVIRONMENT", "prod"
-)  # Default to dev, change to prod when deploying
-env_file = f".env.{ENVIRONMENT}" if ENVIRONMENT != "dev" else ".env"
-load_dotenv(env_file)
+# Default to dev, change to prod when deploying
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
+env_file = f".env.{ENVIRONMENT}"
+load_dotenv(env_file, override=True)
 
 # Fix Heroku connection string
 DATABASE_URL = os.getenv("DATABASE_URL")
