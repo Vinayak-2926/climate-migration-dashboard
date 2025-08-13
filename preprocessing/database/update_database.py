@@ -32,7 +32,7 @@ def upload_csvs_to_postgres(
                     # Upload to PostgreSQL
                     df.to_sql(
                         name=table_name,
-                        con=db_con,
+                        con=transaction.connection,
                         schema=schema,
                         if_exists="replace",  # Overwrite existing data
                         index=False,
