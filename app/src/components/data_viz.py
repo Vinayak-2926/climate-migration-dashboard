@@ -204,12 +204,12 @@ def plot_nri_choropleth():
             scope="usa",
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME_x': True,
+                'COUNTY_NAME': True,
                 'CLIMATE_REGION': True,
                 'FEMA_NRI': True,
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME_x', 'CLIMATE_REGION', 'FEMA_NRI'],
+            custom_data=['COUNTY_NAME', 'CLIMATE_REGION', 'FEMA_NRI'],
         )
 
         # Update hover template to format the display nicely
@@ -286,14 +286,18 @@ def plot_nri_choropleth():
 def receiver_places_choropleth():
     try:
         # Get receiver places data
-        county_data = database.get_receiver_places()
+        receiver_places_data = database.get_receiver_places()
+        
+        county_data = database.get_county_geometries()
+        
+        merged_df = pd.merge(receiver_places_data, county_data, on='COUNTY_FIPS', how='left')
 
         # Convert WKT to geometry objects with error handling
-        county_data['geometry'] = county_data['GEOMETRY'].apply(
+        merged_df['geometry'] = merged_df['GEOMETRY'].apply(
             lambda x: wkt.loads(x) if isinstance(x, str) else x)
 
         # Create GeoDataFrame first (needed for proper GeoSeries)
-        gdf = gpd.GeoDataFrame(county_data)
+        gdf = gpd.GeoDataFrame(merged_df)
 
         # Now simplify the geometry (this is a GeoSeries method)
         gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
@@ -314,13 +318,13 @@ def receiver_places_choropleth():
             geojson=geojson_data,
             color='is_receiving_county',
             color_discrete_map=color_discrete_map,
-            locations=county_data.index,
+            locations=merged_df.index,
             scope="usa",
             labels={
                 'is_receiving_county': 'Receiving County'
             },
             hover_data={
-                'county': True,
+                'NAME': True,
                 'is_receiving_county': True,
             },
             title="Climate Migration Receiver Places"
@@ -508,20 +512,20 @@ def population_by_climate_region(scenario):
             locations='COUNTY_FIPS',
             scope="usa",
             labels={
-                'COUNTY_NAME_x': 'County',
+                'COUNTY_NAME': 'County',
                 'CLIMATE_REGION': 'Climate Region',
                 scenario: 'Population (2065)',
                 'VARIATION_PCT': 'Population Change (%)'
             },
             basemap_visible=False,
             hover_data={
-                'COUNTY_NAME_x': True,
+                'COUNTY_NAME': True,
                 'CLIMATE_REGION': True,
                 scenario: True,
                 'VARIATION_PCT': ':.2f',
                 'COUNTY_FIPS': False  # Hide FIPS code from hover
             },
-            custom_data=['COUNTY_NAME_x', 'CLIMATE_REGION',
+            custom_data=['COUNTY_NAME', 'CLIMATE_REGION',
                          scenario, 'VARIATION_PCT']
         )
 
