@@ -46,7 +46,7 @@ def main():
 
     # Add state names to the us county data
     us_county_data = us_county_data.merge(
-        state_names, left_on="STATE_FIPS", right_on="STATE", how="left"
+        state_names[["STATE", "NAME"]], left_on="STATE_FIPS", right_on="STATE", how="left"
     )
 
     us_county_data = us_county_data.drop(columns=["STATE"])
