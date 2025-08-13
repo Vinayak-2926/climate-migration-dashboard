@@ -46,7 +46,7 @@ class Database:
 
         # Load environment-specific .env file
         # Default to dev, change to prod when deploying
-        ENVIRONMENT = os.getenv("ENVIRONMENT", "prod")
+        ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
         env_file = f".env.{ENVIRONMENT}"
         load_dotenv(env_file, override=True)
 

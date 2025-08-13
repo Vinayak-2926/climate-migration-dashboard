@@ -5,8 +5,8 @@ from urllib.parse import urlparse
 
 # Load environment-specific .env file
 ENVIRONMENT = os.getenv(
-    "ENVIRONMENT", "prod"
-)  # Default to dev, change to prod when deploying
+    "ENVIRONMENT", "dev"
+)  # Default to dev, since this helper file is used to establish connection before mutating the database
 env_file = f".env.{ENVIRONMENT}"
 load_dotenv(env_file, override=True)
 
