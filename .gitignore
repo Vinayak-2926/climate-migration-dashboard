@@ -1,11 +1,12 @@
 # Environment files
 .venv
-.env
-.env.prod
+.env*
 
 # Directories
-data
-__pycache__
-certs
-secrets
-.vscode
+data/
+__pycache__/
+certs/
+secrets/
+.vscode/
+.claude/
+.gemini/

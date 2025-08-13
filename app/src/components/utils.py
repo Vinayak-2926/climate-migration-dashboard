@@ -3,8 +3,23 @@ import streamlit as st
 
 __all__ = [
     "vertical_spacer",
-    "split_row"
+    "split_row",
+    "quote_box"
 ]
+
+# def text_centered(text: str):
+#     st.markdown(f"""<p style="color: red; text-align: center;">{text}</p>""", unsafe_allow_html=True)
+    
+def quote_box(text: str):
+    st.html(f"""
+            <div class="quote-container">
+                <div class="quote-box">
+                    <p class="quote-text">
+                        {text}
+                    </p>
+                </div>
+            </div>
+            """)
 
 def vertical_spacer(n=1):
     """

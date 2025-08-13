@@ -1,9 +1,8 @@
 [theme]
-
+base = "light"
+backgroundColor = "white"
 font = "Roboto"
-
 headingFont = "Inter"
 
-[theme.sidebar]
-
-backgroundColor = "white"
+[server]
+fileWatcherType = "none"

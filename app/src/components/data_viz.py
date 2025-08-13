@@ -27,6 +27,7 @@ __all__ = [
     "plot_nri_choropleth",
     "plot_nri_score",
     "plot_climate_hazards",
+    "receiver_places_choropleth",
     "plot_socioeconomic_indices",
     "plot_socioeconomic_radar",
     "population_by_climate_region",
@@ -154,18 +155,11 @@ def plot_climate_hazards(county_fips, county_name):
     st.plotly_chart(fig)
 
 
-def plot_nri_choropleth(scenario):
+def plot_nri_choropleth():
     try:
         # Load county GeoJSON data
         with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
             counties = json.load(response)
-
-        # Load states GeoJSON data
-        with urlopen('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json') as response:
-            states_json = json.load(response)
-
-        # Extract the features list directly
-        states_features = states_json
 
         # Get county data and merge with population projections
         counties_data = database.get_county_metadata()
@@ -200,62 +194,6 @@ def plot_nri_choropleth(scenario):
         # Ensure it stays as a string
         counties_data['STATE_FIPS'] = counties_data['COUNTY_FIPS'].str[:2]
 
-        # Check if CLIMATE_REGION exists in the dataframe
-        if 'CLIMATE_REGION' not in counties_data.columns:
-            st.error("Climate region data not available")
-            return None
-
-        # For each state, determine the dominant climate region by most common value
-        state_climate_regions = counties_data.groupby('STATE_FIPS')['CLIMATE_REGION'].agg(
-            lambda x: x.value_counts().index[0] if len(x) > 0 else None
-        ).reset_index()
-
-        # Remove any rows where CLIMATE_REGION is None
-        state_climate_regions = state_climate_regions[state_climate_regions['CLIMATE_REGION'].notna(
-        )]
-
-        # Create a dictionary to map state FIPS to climate regions
-        # Ensure keys remain as strings
-        state_region_dict = dict(zip(state_climate_regions['STATE_FIPS'],
-                                     state_climate_regions['CLIMATE_REGION']))
-
-        # Create a list to store modified features
-        modified_features = []
-
-        # Process each state feature
-        for feature in states_features['features']:
-            # Ensure the id is treated as a string
-            state_fips = feature['id']
-
-            # Only include states that have climate region data
-            if state_fips in state_region_dict:
-                # Add climate region to the feature properties
-                if 'properties' not in feature:
-                    feature['properties'] = {}
-
-                feature['properties']['CLIMATE_REGION'] = state_region_dict[state_fips]
-                modified_features.append(feature)
-
-        # Create a GeoDataFrame from the modified features
-        states_gdf = gpd.GeoDataFrame.from_features(modified_features)
-
-        # Ensure 'id' column is treated as string if it exists in the GeoDataFrame
-        if 'id' in states_gdf.columns:
-            states_gdf['id'] = states_gdf['id'].astype(str)
-
-        # Dissolve states by climate region
-        # This will create one geometry per unique climate region
-        climate_regions_gdf = states_gdf.dissolve(by='CLIMATE_REGION')
-
-        # Clean up geometries to remove internal boundaries
-        for idx, row in climate_regions_gdf.iterrows():
-            if row.geometry.geom_type == 'MultiPolygon':
-                cleaned_geom = unary_union(row.geometry)
-                climate_regions_gdf.at[idx, 'geometry'] = cleaned_geom
-
-        # Convert to GeoJSON format for Plotly
-        climate_regions_geojson = json.loads(climate_regions_gdf.to_json())
-
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
             counties_data,
@@ -280,27 +218,9 @@ def plot_nri_choropleth(scenario):
             hovertemplate='<b>%{customdata[0]}</b><br>' +
             'Climate Region: %{customdata[1]}<br>' +
             'FEMA Risk Level: %{customdata[2]:.1f}<br>' +
-            '<extra></extra>'  # Removes trace name from hover
+            '<extra></extra>',  # Removes trace name from hover
+            marker_line_width=0
         )
-
-        # Add climate regions overlay with white borders
-        fig.add_trace(
-            go.Choropleth(
-                geojson=climate_regions_geojson,
-                # Convert index to list to ensure string format
-                locations=climate_regions_gdf.index.tolist(),
-                z=[1] * len(climate_regions_gdf),  # Dummy values for coloring
-                # Transparent fill
-                colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']],
-                marker_line_color='white',
-                marker_line_width=5,
-                showscale=False,
-                name="Climate Regions",
-                showlegend=False,
-                hoverinfo='skip'
-            )
-        )
-
         for label, color in RISK_COLOR_MAPPING.items():
             fig.add_trace(
                 go.Scatter(
@@ -332,20 +252,12 @@ def plot_nri_choropleth(scenario):
         fig.update_layout(
             height=800,
             title=dict(
-                text="Natural Hazard Risk Index Across Counties",
+                text="Natural Hazard Risk Index Across Counties in the US",
                 automargin=True,
                 y=0.95  # Adjust vertical position
             ),
-            legend=dict(
-                title="",
-                itemsizing="constant",
-                groupclick="toggleitem",
-                tracegroupgap=20,  # Add space between legend groups
-                yanchor="top",
-                y=0.9,
-                xanchor="left",
-                x=1.01,
-                orientation="v"
+            coloraxis_colorbar=dict(
+                title="NRI Score"
             ),
             margin=dict(t=100, b=50, l=50, r=50),
             autosize=True,
@@ -370,7 +282,103 @@ def plot_nri_choropleth(scenario):
         st.error(f"Could not create map: {e}")
         print(f"Could not connect to url or create map.\n{e}")
         return None
+    
+def receiver_places_choropleth():
+    try:
+        # Get receiver places data
+        receiver_places_data = database.get_receiver_places()
+        
+        county_data = database.get_county_geometries()
+        
+        merged_df = pd.merge(receiver_places_data, county_data, on='COUNTY_FIPS', how='left')
 
+        # Convert WKT to geometry objects with error handling
+        merged_df['geometry'] = merged_df['GEOMETRY'].apply(
+            lambda x: wkt.loads(x) if isinstance(x, str) else x)
+
+        # Create GeoDataFrame first (needed for proper GeoSeries)
+        gdf = gpd.GeoDataFrame(merged_df)
+
+        # Now simplify the geometry (this is a GeoSeries method)
+        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
+
+        # Convert to GeoJSON format for Plotly
+        geojson_data = json.loads(gdf.to_json())
+        
+        # Define discrete color mapping for is_receiving_county
+        color_discrete_map = {
+            "No": "rgb(230, 230, 230)",
+            "Maybe": DIVERGING_RGB[1],
+            "Yes": DIVERGING_RGB[0]
+        }
+        
+        # Create choropleth map using discrete colors
+        fig = px.choropleth(
+            gdf,
+            geojson=geojson_data,
+            color='is_receiving_county',
+            color_discrete_map=color_discrete_map,
+            locations=merged_df.index,
+            scope="usa",
+            labels={
+                'is_receiving_county': 'Receiving County'
+            },
+            hover_data={
+                'NAME': True,
+                'is_receiving_county': True,
+            },
+            title="Climate Migration Receiver Places"
+        )
+        
+        # Update hover template
+        fig.update_traces(
+            hovertemplate='<b>%{customdata[0]}</b><br>' +
+            'Receiver place: %{customdata[1]}<br>' +
+            '<extra></extra>',
+            marker_line_width=0
+        )
+        
+        # Configure the map layout
+        fig.update_geos(
+            visible=False,
+            scope="usa",
+            showcoastlines=True,
+            projection_type="albers usa"
+        )
+        
+        fig.update_layout(
+            height=800,
+            title=dict(
+                text="PLACE Initiative - Receiver Places",
+                automargin=True,
+                y=0.95
+            ),
+            margin=dict(t=100, b=50, l=50, r=50),
+            autosize=True,
+            legend=dict(
+                title="County is a receiver place?",
+                orientation="v",
+                yanchor="top",
+                y=0.9,
+                xanchor="left",
+                x=1.01
+            )
+        )
+        
+        # Display the chart
+        event = st.plotly_chart(fig,
+                                on_select="ignore",
+                                selection_mode=["points"],
+                                config=choropleth_config
+                                )
+        
+        return event
+        
+    except Exception as e:
+        st.error(f"Could not create receiver places map: {e}")
+        print(f"Could not create receiver places map.\\n{e}")
+        return None
+    
 
 def population_by_climate_region(scenario):
     """

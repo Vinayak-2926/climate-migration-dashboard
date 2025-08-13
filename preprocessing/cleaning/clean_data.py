@@ -12,6 +12,7 @@ PATHS = {
         "education": Path("./data/raw/education_data"),
         "housing": Path("./data/raw/housing_data"),
         "population": Path("./data/raw/population_data"),
+        "county": Path("./data/raw/county_data"),
         "counties": Path("./data/raw/counties_data"),
         "job_openings": Path("./data/raw/monthly_job_openings_csvs_data"),
         "crime": Path("./data/raw/state_crime_data"),
@@ -355,7 +356,7 @@ class DataCleaner:
         return pd.DataFrame()
     
     @classmethod
-    def process_public_school_data(cls, data_type: str, year: int = 2023) -> pd.DataFrame:
+    def process_public_school_data(cls, year: int = 2023) -> pd.DataFrame:
         # Load county population data
         county_with_pop = cls.load_county_population_data()
         county_with_pop_year = county_with_pop[year].copy()
@@ -419,6 +420,80 @@ class DataCleaner:
         school_data_with_pop = school_data_with_pop.dropna(how='all')
         
         return school_data_with_pop
+    
+    @classmethod
+    def process_receiver_places_data(cls) -> pd.DataFrame:
+        """Process receiver places data."""
+        # Load and process receiver places data
+        receiver_places_path = PATHS["raw_data"]["county"] / "receiver_places.csv"
+        receiver_places = pd.read_csv(receiver_places_path)
+
+        # Split the 'County' column into 'COUNTY_NAME' and 'STATE_ABBREVIATION'
+        receiver_places[['COUNTY_NAME', 'STATE_ABBREVIATION']] = receiver_places['County'].str.split(', ', expand=True)
+
+        # Drop rows for District of Columbia
+        receiver_places = receiver_places[receiver_places['STATE_ABBREVIATION'] != 'DC'].copy()
+
+        # Define state abbreviation to FIPS mapping
+        state_to_fips = {
+            "AL": "01", "AZ": "04", "AR": "05", "CA": "06", "CO": "08", "CT": "09", "DE": "10", "FL": "12",
+            "GA": "13", "ID": "16", "IL": "17", "IN": "18", "IA": "19", "KS": "20", "KY": "21", "LA": "22", 
+            "ME": "23", "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28", "MO": "29", "MT": "30", 
+            "NE": "31", "NV": "32", "NH": "33", "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
+            "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44", "SC": "45", "SD": "46", "TN": "47", 
+            "TX": "48", "UT": "49", "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55", "WY": "56"
+        }
+        receiver_places['STATE_FIPS'] = receiver_places['STATE_ABBREVIATION'].map(state_to_fips)
+
+        # Load county population data for a recent year to get county FIPS codes
+        county_pop_data = cls.load_county_population_data()
+        year = 2020
+        if year not in county_pop_data:
+            year = max(county_pop_data.keys()) if county_pop_data else None
+        
+        if not year:
+            print("Error: No population data found.")
+            return pd.DataFrame()
+
+        county_pop = county_pop_data[year].copy()
+        county_pop['COUNTY_NAME_POP'] = county_pop['NAME'].str.split(',').str[0]
+
+        # Merge to get COUNTY_FIPS
+        merged_df = pd.merge(
+            receiver_places,
+            county_pop[['COUNTY_FIPS', 'STATE', 'COUNTY_NAME_POP']],
+            left_on=['STATE_FIPS', 'COUNTY_NAME'],
+            right_on=['STATE', 'COUNTY_NAME_POP'],
+            how='left'
+        )
+
+        # Clean up columns
+        merged_df = merged_df.drop(columns=['County', 'STATE_ABBREVIATION', 'STATE_FIPS', 'STATE', 'COUNTY_NAME', 'COUNTY_NAME_POP'])
+        
+        # Add YEAR column
+        merged_df['YEAR'] = year
+
+        # Rename columns to be lowercase with underscores
+        column_rename_map = {
+            'Total Points': 'total_points',
+            ' % of Possible Points': 'percent_of_possible_points',
+            'Receiving County?': 'is_receiving_county',
+            'Heat (0-1)': 'heat_risk',
+            'Wet Bulb (0-1)': 'wet_bulb_risk',
+            'Farm Crop Yields (0-1)': 'farm_crop_yields_risk',
+            'Sea Level Rise (0-3)': 'sea_level_rise_risk',
+            'Very Large Fires (0-2)': 'very_large_fires_risk',
+            'Econ. Damages (0-1)': 'economic_damages_risk',
+            'Water Stress (0-4)': 'water_stress_risk',
+            'Extreme Rainfall (0-1)': 'extreme_rainfall_risk',
+            'Hurricanes (0-1)': 'hurricanes_risk',
+            'COUNTY_FIPS': 'COUNTY_FIPS',
+            'YEAR': 'YEAR'
+        }
+        merged_df = merged_df.rename(columns=column_rename_map)
+        
+        print(merged_df.head())
+        return merged_df
 
 
     @classmethod
@@ -437,13 +512,15 @@ class DataCleaner:
         elif data_type == "cbsa":
             data = cls.cbsa_data()
         elif data_type == "public_school":
-            data = cls.process_public_school_data(data_type)
+            data = cls.process_public_school_data()
+        elif data_type == "receiver_places":
+            data = cls.process_receiver_places_data()
         else:
             print(f"Unknown data type: {data_type}")
             return
             
         # Load population data if not already included
-        if 'POPULATION' not in data.columns and data_type not in ["job_openings", "crime"]:
+        if 'POPULATION' not in data.columns and data_type not in ["job_openings", "crime", "receiver_places"]:
             population_data = cls.load_population_data()
             # Merge datasets
             merged_data = pd.merge(
@@ -582,9 +659,8 @@ class DataCleaner:
 
 def main():
     # Process all types of data
-    data_types = ["economic", "education", "housing", "job_openings", "crime", "fema_nri", "cbsa", "public_school"]
+    data_types = ["economic", "education", "housing", "job_openings", "crime", "fema_nri", "cbsa", "public_school", "receiver_places"]
 
-    # for data_type in data_types:
     for data_type in data_types:
         DataCleaner.process_and_save_data(data_type)
         
@@ -592,8 +668,6 @@ def main():
     DataCleaner.clean_counties_data()
 
     print("All data processing completed.")
-    
-    # DataCleaner.load_msa_data()
 
 
 if __name__ == "__main__":
