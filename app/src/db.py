@@ -23,6 +23,7 @@ class Table(Enum):
     COUNTY_PROJECTED_INDICES = "projected_socioeconomic_indices"
 
     COUNTY_COMBINED_PROJECTIONS = "combined_2065_data"
+    RECEIVER_PLACES = "cleaned_receiver_places_data"
 
     # Population related tables
     POPULATION_HISTORY = "timeseries_population"
@@ -444,15 +445,25 @@ class Database:
             
     @st.cache_data
     def get_receiver_places(_self):
-        conn = _self.conn
-        
         try:
-            df = pd.read_sql("SELECT * FROM receiver_place_with_geometry", _self.engine)
+            df = pd.read_sql(f"SELECT * FROM {Table.RECEIVER_PLACES.value}", _self.engine)
             return df
         except Exception as e:
             st.error(f"Error loading receiver places: {str(e)}")
             st.stop()
+            
+    @st.cache_data
+    def get_county_geometries(_self):
+        try:
+            query = text('SELECT "COUNTY_FIPS", "NAME", "GEOMETRY" FROM '
+                         f'{Table.COUNTY_METADATA.value}')
+            
+            df = pd.read_sql(query, _self.engine)
 
+            return df
+        except Exception as e:
+            st.error(f"Error loading county geometries: {str(e)}")
+            st.stop()
 
 # Create a singleton instance for easy import
 db = Database()
