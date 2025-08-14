@@ -23,11 +23,11 @@ PUBLIC_SCHOOL_DATA = CLEANED_DIR / "cleaned_public_school_data.csv"
 
 def calculate_z_scores(df):
     """
-    Calculate z-scores for STUDENT_TEACHER_RATIO, AVAILABLE_HOUSING_UNITS, UNEMPLOYMENT_RATE
+    Calculate z-scores for student_teacher_ratio, available_housing_units, unemployment_rate
     for each county compared to all other counties nationally
     """    
     # Define indicators to calculate z-scores for
-    indicators = ['STUDENT_TEACHER_RATIO', 'AVAILABLE_HOUSING_UNITS', 'UNEMPLOYMENT_RATE']
+    indicators = ['student_teacher_ratio', 'available_housing_units', 'unemployment_rate']
     
     # Make sure indicators exist in the dataframe
     for indicator in indicators:
@@ -35,9 +35,9 @@ def calculate_z_scores(df):
             print(f"Warning: {indicator} not found in the data")
     
     # Group by scenario to calculate z-scores within each scenario
-    for scenario in df['SCENARIO'].unique():
+    for scenario in df['scenario'].unique():
         # Filter data for current scenario
-        scenario_mask = df['SCENARIO'] == scenario
+        scenario_mask = df['scenario'] == scenario
         
         # Calculate z-scores for each indicator
         for indicator in indicators:
@@ -75,40 +75,40 @@ def load_and_merge_data():
     
     # Merge all dataframes on COUNTY_FIPS
     merged_df = economic_df.merge(
-        education_df, on=['COUNTY_FIPS','STATE','COUNTY','NAME','POPULATION', 'YEAR'], how='inner'
+        education_df, on=['county_fips','state','county','name','population', 'year'], how='inner'
     ).merge(
-        housing_df, on=['COUNTY_FIPS','STATE','COUNTY','NAME','POPULATION', 'YEAR'], how='inner'
+        housing_df, on=['county_fips','state','county','name','population', 'year'], how='inner'
     ).merge(
-        job_openings_df, on=['COUNTY_FIPS','STATE','COUNTY','NAME','POPULATION', 'YEAR'], how='inner'
+        job_openings_df, on=['county_fips','state','county','name','population', 'year'], how='inner'
     ).merge(
-        public_school_df, on=['COUNTY_FIPS','STATE','COUNTY','NAME','POPULATION', 'YEAR'], how='outer'
+        public_school_df, on=['county_fips','state','county','name','population', 'year'], how='outer'
     )
     
     # Drop columns containing 'z_score'
     merged_df = merged_df.loc[:, ~merged_df.columns.str.contains('z_score', case=False)]
     
     # Set school data to 0 for years other than 2023
-    merged_df.loc[merged_df["YEAR"] != 2023, ["PUBLIC_SCHOOL_STUDENTS", "PUBLIC_SCHOOL_TEACHERS", "STUDENT_TEACHER_RATIO"]] = 0
+    merged_df.loc[merged_df["year"] != 2023, ["public_school_students", "public_school_teachers", "student_teacher_ratio"]] = 0
     
     return merged_df
 
 def prepare_filtered_data(merged_df):
     """Prepare filtered data for 2023"""
     filter_columns = [
-        'PUBLIC_SCHOOL_STUDENTS', 'ELEMENTARY_SCHOOL_POPULATION', 
-        'MIDDLE_SCHOOL_POPULATION', 'HIGH_SCHOOL_POULATION', 
-        'COUNTY_FIPS', 'STATE', 'COUNTY', 'NAME', 
-        'TOTAL_EMPLOYED_POPULATION', 'TOTAL_LABOR_FORCE',
-        'JOB_OPENING_JAN', 'JOB_OPENING_FEB', 'JOB_OPENING_MAR', 
-        'JOB_OPENING_APR', 'JOB_OPENING_MAY', 'JOB_OPENING_JUN', 
-        'JOB_OPENING_JUL', 'JOB_OPENING_AUG', 'JOB_OPENING_SEP', 
-        'JOB_OPENING_OCT', 'JOB_OPENING_NOV', 'JOB_OPENING_DEC',
-        'POPULATION', 'YEAR', 'OCCUPIED_HOUSING_UNITS'
+        'public_school_students', 'elementary_school_population', 
+        'middle_school_population', 'high_school_population', 
+        'county_fips', 'state', 'county', 'name', 
+        'total_employed_population', 'total_labor_force',
+        'job_opening_jan', 'job_opening_feb', 'job_opening_mar', 
+        'job_opening_apr', 'job_opening_may', 'job_opening_jun', 
+        'job_opening_jul', 'job_opening_aug', 'job_opening_sep', 
+        'job_opening_oct', 'job_opening_nov', 'job_opening_dec',
+        'population', 'year', 'occupied_housing_units',
     ]
     
     filtered_df = merged_df[filter_columns]
-    filtered_df = filtered_df[filtered_df["YEAR"] == 2023]
-    filtered_df['COUNTY_FIPS'] = filtered_df['COUNTY_FIPS'].astype(str).str.zfill(5)
+    filtered_df = filtered_df[filtered_df["year"] == 2023]
+    filtered_df['county_fips'] = filtered_df['county_fips'].astype(str).str.zfill(5)
     
     return filtered_df
 
@@ -116,43 +116,45 @@ def process_population_data():
     """Process population data and calculate percentage changes"""
     pop_project_df = pd.read_csv(POP_PROJECT)
     pop_2023 = pd.read_csv(POP_2023)
+
+    pop_2023.columns = pop_2023.columns.str.lower()
     
     # Format county FIPS codes
-    pop_2023["STATE"] = pop_2023["STATE"].astype(str).str.zfill(2)
-    pop_2023["COUNTY"] = pop_2023["COUNTY"].astype(str).str.zfill(3)
-    pop_2023["COUNTY_FIPS"] = pop_2023["STATE"] + pop_2023["COUNTY"]
-    pop_project_df["COUNTY_FIPS"] = pop_project_df["COUNTY_FIPS"].astype(str).str.zfill(5)
+    pop_2023["state"] = pop_2023["state"].astype(str).str.zfill(2)
+    pop_2023["county"] = pop_2023["county"].astype(str).str.zfill(3)
+    pop_2023["county_fips"] = pop_2023["state"] + pop_2023["county"]
+    pop_project_df["county_fips"] = pop_project_df["county_fips"].astype(str).str.zfill(5)
     
     # Merge population datasets
     pop_combined = pop_project_df.merge(
         pop_2023,
-        on=['COUNTY_FIPS'],
+        on=['county_fips'],
         how='left'
     )
     
     # Rename and select columns
-    pop_combined.rename(columns={"B01003_001E": "POPULATION_2023"}, inplace=True)
+    pop_combined.rename(columns={"b01003_001e": "population_2023"}, inplace=True)
     pop_combined = pop_combined[[
-        "COUNTY_FIPS", "STATE", "COUNTY", "NAME", "POPULATION_2023", 
-        "POPULATION_2065_S3", "POPULATION_2065_S5b", "POPULATION_2065_S5a", 
-        "POPULATION_2065_S5c", "CLIMATE_REGION", "POPULATION_2010"
+        "county_fips", "state", "county", "name", "population_2023", 
+        "population_2065_s3", "population_2065_s5b", "population_2065_s5a", 
+        "population_2065_s5c", "climate_region", "population_2010"
     ]]
     
     # Calculate percentage changes for each scenario
-    pop_combined["S3_Percentage_Change"] = ((pop_combined["POPULATION_2065_S3"] - pop_combined["POPULATION_2023"]) / pop_combined["POPULATION_2023"]) * 100
-    pop_combined["S5b_Percentage_Change"] = ((pop_combined["POPULATION_2065_S5b"] - pop_combined["POPULATION_2023"]) / pop_combined["POPULATION_2023"]) * 100
-    pop_combined["S5a_Percentage_Change"] = ((pop_combined["POPULATION_2065_S5a"] - pop_combined["POPULATION_2023"]) / pop_combined["POPULATION_2023"]) * 100
-    pop_combined["S5c_Percentage_Change"] = ((pop_combined["POPULATION_2065_S5c"] - pop_combined["POPULATION_2023"]) / pop_combined["POPULATION_2023"]) * 100
+    pop_combined["s3_percentage_change"] = ((pop_combined["population_2065_s3"] - pop_combined["population_2023"]) / pop_combined["population_2023"]) * 100
+    pop_combined["s5b_percentage_change"] = ((pop_combined["population_2065_s5b"] - pop_combined["population_2023"]) / pop_combined["population_2023"]) * 100
+    pop_combined["s5a_percentage_change"] = ((pop_combined["population_2065_s5a"] - pop_combined["population_2023"]) / pop_combined["population_2023"]) * 100
+    pop_combined["s5c_percentage_change"] = ((pop_combined["population_2065_s5c"] - pop_combined["population_2023"]) / pop_combined["population_2023"]) * 100
     
     return pop_combined
 
 def calculate_projected_values(df, base_year, percentage_change, scenario_name):
     """Calculate projected values based on percentage change"""
-    projected_df = df[df["YEAR"] == base_year].copy()
-    projected_df["SCENARIO"] = scenario_name
+    projected_df = df[df["year"] == base_year].copy()
+    projected_df["scenario"] = scenario_name
     
     # Exclude columns that should not be scaled
-    columns_to_exclude = ["COUNTY_FIPS", "STATE", "COUNTY", "YEAR", "NAME", "SCENARIO"]
+    columns_to_exclude = ["county_fips", "state", "county", "year", "name", "scenario"]
     numeric_cols = [col for col in df.columns if col not in columns_to_exclude]
     
     # Scale the numeric columns for the projected values
@@ -164,7 +166,7 @@ def calculate_projected_values(df, base_year, percentage_change, scenario_name):
 def generate_county_projections(filtered_df, pop_combined):
     """Generate projections for all counties under different scenarios"""
     # Get all unique counties
-    all_counties = filtered_df['COUNTY_FIPS'].unique()
+    all_counties = filtered_df['county_fips'].unique()
     
     # Create an empty DataFrame to store all results
     all_counties_2065_combined = pd.DataFrame()
@@ -172,38 +174,38 @@ def generate_county_projections(filtered_df, pop_combined):
     # Process each county
     for county in all_counties:
         # Filter data for the current county
-        county_df = filtered_df[filtered_df['COUNTY_FIPS'] == county].copy()
+        county_df = filtered_df[filtered_df['county_fips'] == county].copy()
         
         # Get original data for base year
-        original_df = county_df[county_df["YEAR"] == 2023].copy()
-        original_df["SCENARIO"] = "Original"
+        original_df = county_df[county_df["year"] == 2023].copy()
+        original_df["scenario"] = "original"
         
         # Extract this county's percentage changes
-        county_proj = pop_combined[pop_combined["COUNTY_FIPS"] == county]
+        county_proj = pop_combined[pop_combined["county_fips"] == county]
         if county_proj.empty:
-            print(f"Skipping COUNTY_FIPS {county} - no projection data found.")
+            print(f"Skipping county_fips {county} - no projection data found.")
             continue
             
         percentage_changes = county_proj[
-            ["S3_Percentage_Change", "S5b_Percentage_Change", "S5a_Percentage_Change", "S5c_Percentage_Change"]
+            ["s3_percentage_change", "s5b_percentage_change", "s5a_percentage_change", "s5c_percentage_change"]
         ].iloc[0].to_dict()
         
         # Calculate projections for each scenario
         s3_2065 = calculate_projected_values(county_df, base_year=2023,
-                                           percentage_change=percentage_changes["S3_Percentage_Change"],
-                                           scenario_name="S3")
+                                           percentage_change=percentage_changes["s3_percentage_change"],
+                                           scenario_name="s3")
         
         s5b_2065 = calculate_projected_values(county_df, base_year=2023,
-                                            percentage_change=percentage_changes["S5b_Percentage_Change"],
-                                            scenario_name="S5b")
+                                            percentage_change=percentage_changes["s5b_percentage_change"],
+                                            scenario_name="s5b")
         
         s5a_2065 = calculate_projected_values(county_df, base_year=2023,
-                                            percentage_change=percentage_changes["S5a_Percentage_Change"],
-                                            scenario_name="S5a")
+                                            percentage_change=percentage_changes["s5a_percentage_change"],
+                                            scenario_name="s5a")
         
         s5c_2065 = calculate_projected_values(county_df, base_year=2023,
-                                            percentage_change=percentage_changes["S5c_Percentage_Change"],
-                                            scenario_name="S5c")
+                                            percentage_change=percentage_changes["s5c_percentage_change"],
+                                            scenario_name="s5c")
         
         # Combine all scenarios for this county
         county_2065_combined = pd.concat([original_df, s3_2065, s5b_2065, s5a_2065, s5c_2065],
@@ -217,49 +219,49 @@ def generate_county_projections(filtered_df, pop_combined):
 
 def calculate_derived_metrics(all_counties_2065_combined, merged_df):
     """Calculate derived metrics for projected data"""
-    merged_df_2023 = merged_df[merged_df["YEAR"] == 2023].copy()
-    merged_df_2023["COUNTY_FIPS"] = merged_df_2023["COUNTY_FIPS"].astype(str).str.zfill(5)
-    all_counties = merged_df_2023['COUNTY_FIPS'].unique()
+    merged_df_2023 = merged_df[merged_df["year"] == 2023].copy()
+    merged_df_2023["county_fips"] = merged_df_2023["county_fips"].astype(str).str.zfill(5)
+    all_counties = merged_df_2023['county_fips'].unique()
     
     for county in all_counties:
-        all_counties_2065_combined["COUNTY_FIPS"] = all_counties_2065_combined["COUNTY_FIPS"].astype(str).str.zfill(5)
-        county_df = merged_df_2023[merged_df_2023['COUNTY_FIPS'] == county].copy()
-        teachers_2023 = county_df["PUBLIC_SCHOOL_TEACHERS"]
-        housing_units_2023 = county_df["TOTAL_HOUSING_UNITS"]
-        employed_population_2023 = county_df["TOTAL_EMPLOYED_POPULATION"]
+        all_counties_2065_combined["county_fips"] = all_counties_2065_combined["county_fips"].astype(str).str.zfill(5)
+        county_df = merged_df_2023[merged_df_2023['county_fips'] == county].copy()
+        teachers_2023 = county_df["public_school_teachers"]
+        housing_units_2023 = county_df["total_housing_units"]
+        employed_population_2023 = county_df["total_employed_population"]
         
         if teachers_2023.empty or housing_units_2023.empty or employed_population_2023.empty:
-            print(f"Missing data for COUNTY_FIPS {county}")
+            print(f"Missing data for county_fips {county}")
             
         # Ensure the correct teacher count is applied for each county
         teacher_count = teachers_2023.values[0] if not teachers_2023.empty else 1  # Avoid division by zero
-        all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "STUDENT_TEACHER_RATIO"] = (
-            all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "PUBLIC_SCHOOL_STUDENTS"] / teacher_count
+        all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "student_teacher_ratio"] = (
+            all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "public_school_students"] / teacher_count
         )
         
         housing_units_count = housing_units_2023.values[0] if not housing_units_2023.empty else 1  # Avoid division by zero
-        all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "AVAILABLE_HOUSING_UNITS"] = (
-            housing_units_count - all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "OCCUPIED_HOUSING_UNITS"])
+        all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "available_housing_units"] = (
+            housing_units_count - all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "occupied_housing_units"])
         
         employed_population_count = employed_population_2023.values[0] if not employed_population_2023.empty else 1  # Avoid division by zero
-        all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "TOTAL_EMPLOYED_PERCENTAGE"] = (
-            employed_population_count / all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "TOTAL_LABOR_FORCE"]) * 100
+        all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "total_employed_percentage"] = (
+            employed_population_count / all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "total_labor_force"]) * 100
         
-        all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "UNEMPLOYMENT_RATE"] = (
-            100 - all_counties_2065_combined.loc[all_counties_2065_combined['COUNTY_FIPS'] == county, "TOTAL_EMPLOYED_PERCENTAGE"])
+        all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "unemployment_rate"] = (
+            100 - all_counties_2065_combined.loc[all_counties_2065_combined['county_fips'] == county, "total_employed_percentage"])
     # Format the state and county codes
-    all_counties_2065_combined["STATE"] = all_counties_2065_combined["STATE"].astype(str).str.zfill(2)
-    all_counties_2065_combined["COUNTY"] = all_counties_2065_combined["COUNTY"].astype(str).str.zfill(3)
+    all_counties_2065_combined["state"] = all_counties_2065_combined["state"].astype(str).str.zfill(2)
+    all_counties_2065_combined["county"] = all_counties_2065_combined["county"].astype(str).str.zfill(3)
     
     return all_counties_2065_combined
 
 def calculate_indices(all_counties_2065_combined):
     """Calculate socioeconomic indices from the projected data"""
     # Filter to include only counties with school data
-    index_df = all_counties_2065_combined[all_counties_2065_combined['PUBLIC_SCHOOL_STUDENTS'] > 0].copy()
+    index_df = all_counties_2065_combined[all_counties_2065_combined['public_school_students'] > 0].copy()
     
     # Columns to standardize
-    cols = ['UNEMPLOYMENT_RATE', 'STUDENT_TEACHER_RATIO', 'AVAILABLE_HOUSING_UNITS']
+    cols = ['unemployment_rate', 'student_teacher_ratio', 'available_housing_units']
     
     # Standardize the data
     df_scaled = index_df.copy()
@@ -268,32 +270,32 @@ def calculate_indices(all_counties_2065_combined):
     
     # Calculate different indices with different weights
     # Flip unemployment and student-teacher ratio (lower is better)
-    df_scaled["INDEX_BALANCED"] = (
-        (-df_scaled["z_UNEMPLOYMENT_RATE"]) * 0.33 + 
-        (-df_scaled["z_STUDENT_TEACHER_RATIO"]) * 0.33 + 
-        df_scaled["z_AVAILABLE_HOUSING_UNITS"] * 0.33
+    df_scaled["index_balanced"] = (
+        (-df_scaled["z_unemployment_rate"]) * 0.33 + 
+        (-df_scaled["z_student_teacher_ratio"]) * 0.33 + 
+        df_scaled["z_available_housing_units"] * 0.33
     )
     
-    df_scaled["INDEX_EMPLOYMENT"] = (
-        (-df_scaled["z_UNEMPLOYMENT_RATE"]) * 0.6 + 
-        (-df_scaled["z_STUDENT_TEACHER_RATIO"]) * 0.2 + 
-        df_scaled["z_AVAILABLE_HOUSING_UNITS"] * 0.2
+    df_scaled["index_employment"] = (
+        (-df_scaled["z_unemployment_rate"]) * 0.6 + 
+        (-df_scaled["z_student_teacher_ratio"]) * 0.2 + 
+        df_scaled["z_available_housing_units"] * 0.2
     )
     
-    df_scaled["INDEX_HOUSING"] = (  # Fixed typo in variable name
-        (-df_scaled["z_UNEMPLOYMENT_RATE"]) * 0.2 + 
-        (-df_scaled["z_STUDENT_TEACHER_RATIO"]) * 0.2 + 
-        df_scaled["z_AVAILABLE_HOUSING_UNITS"] * 0.6
+    df_scaled["index_housing"] = (  # Fixed typo in variable name
+        (-df_scaled["z_unemployment_rate"]) * 0.2 + 
+        (-df_scaled["z_student_teacher_ratio"]) * 0.2 + 
+        df_scaled["z_available_housing_units"] * 0.6
     )
     
-    df_scaled["INDEX_EDUCATION"] = (
-        (-df_scaled["z_UNEMPLOYMENT_RATE"]) * 0.2 + 
-        (-df_scaled["z_STUDENT_TEACHER_RATIO"]) * 0.6 + 
-        df_scaled["z_AVAILABLE_HOUSING_UNITS"] * 0.2
+    df_scaled["index_education"] = (
+        (-df_scaled["z_unemployment_rate"]) * 0.2 + 
+        (-df_scaled["z_student_teacher_ratio"]) * 0.6 + 
+        df_scaled["z_available_housing_units"] * 0.2
     )
     
     # Extract results and return
-    results_df = df_scaled[['COUNTY_FIPS', 'SCENARIO', 'INDEX_BALANCED', 'INDEX_EMPLOYMENT', 'INDEX_HOUSING', 'INDEX_EDUCATION']]
+    results_df = df_scaled[['county_fips', 'scenario', 'index_balanced', 'index_employment', 'index_housing', 'index_education']]
     return results_df
 
 def main():
@@ -311,12 +313,16 @@ def main():
     all_counties_2065_combined = calculate_derived_metrics(all_counties_2065_combined, merged_df)
 
     all_counties_2065_combined = calculate_z_scores(all_counties_2065_combined)
+
+    all_counties_2065_combined.columns = all_counties_2065_combined.columns.str.lower()
     
     # Save combined projected data
     all_counties_2065_combined.to_csv(PROJECTED_DATA / "combined_2065_data.csv", index=False)
     
     # Calculate socioeconomic indices
     results_df = calculate_indices(all_counties_2065_combined)
+
+    results_df.columns = results_df.columns.str.lower()
     
     # Save results
     output_path = PROJECTED_DATA / "projected_socioeconomic_indices.csv"

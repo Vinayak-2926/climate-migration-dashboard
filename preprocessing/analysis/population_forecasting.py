@@ -20,6 +20,8 @@ def main():
             'STATE': str,
         }
     )
+    
+    state_names = state_names[["STATE", "NAME"]]
 
     us_county_data = pd.read_csv(
         "./data/raw/population_data/census_population_data_2010.csv",
@@ -38,6 +40,8 @@ def main():
             "B01003_001E": "POPULATION_2010",
         },
     )
+    
+    us_county_data = us_county_data.drop("geometry", axis=1)
 
     # Create full FIPS code
     us_county_data["COUNTY_FIPS"] = (
@@ -46,7 +50,7 @@ def main():
 
     # Add state names to the us county data
     us_county_data = us_county_data.merge(
-        state_names, left_on="STATE_FIPS", right_on="STATE", how="left"
+        state_names[["STATE", "NAME"]], left_on="STATE_FIPS", right_on="STATE", how="left"
     )
 
     us_county_data = us_county_data.drop(columns=["STATE"])
@@ -257,7 +261,9 @@ def main():
     # us_county_data['COUNTY_FIPS'] = us_county_data['STATE_FIPS'] + \
     #     us_county_data['COUNTY_FIPS']
 
-    us_county_data = us_county_data.set_index("COUNTY_FIPS")
+    us_county_data.columns = us_county_data.columns.str.lower()
+
+    us_county_data = us_county_data.set_index("county_fips")
 
     # Export the final dataset to CSV
     us_county_data.to_csv(OUTPUT_FILE)
