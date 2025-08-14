@@ -9,6 +9,9 @@ from urllib.parse import urlparse
 
 
 class Table(Enum):
+    # State table
+    STATE_METADATA = "state_names"
+    
     # County table
     COUNTY_METADATA = "county"
 
@@ -477,6 +480,18 @@ class Database:
             return df
         except Exception as e:
             st.error(f"Error loading county geometries: {str(e)}")
+            st.stop()
+            
+    def get_state_geometries(_self):
+        try:
+            query = text('SELECT "STATE_FIPS", "NAME", "GEOMETRY" FROM '
+                         f'{Table.STATE_METADATA.value}')
+            
+            df = pd.read_sql(query, _self.engine)
+
+            return df
+        except Exception as e:
+            st.error(f"Error loading state geometries: {str(e)}")
             st.stop()
 
 # Create a singleton instance for easy import

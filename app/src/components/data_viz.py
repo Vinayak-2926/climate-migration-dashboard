@@ -386,28 +386,27 @@ def population_by_climate_region(scenario):
         The plotly chart event object
     """
     try:
-        # Load county GeoJSON data
-        with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
-            counties = json.load(response)
-
-        # Load states GeoJSON data
-        with urlopen('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json') as response:
-            states_json = json.load(response)
+        state_geometries = database.get_state_geometries()
+        state_geometries['geometry'] = state_geometries['GEOMETRY'].apply(
+            lambda x: wkt.loads(x) if isinstance(x, str) else x)
+        state_geometries = gpd.GeoDataFrame(state_geometries)
+        
+        states_json = json.loads(state_geometries.to_json())
 
         # Extract the features list directly
         states_features = states_json
 
         # Get county data and merge with population projections
-
         counties_data = database.get_county_metadata()
+        population_data = database.get_population_projections_by_fips()
         counties_data = counties_data.merge(
-            database.get_population_projections_by_fips(),
+            population_data,
             how='inner',
             on='county_fips'
         )
 
         # Convert WKT to geometry objects
-        counties_data['geometry'] = counties_data['geometry_x'].apply(wkt.loads)
+        counties_data['geometry'] = counties_data['geometry'].apply(wkt.loads)
 
         # Get centroids of geometries for marker placement
         counties_data['centroid_lon'] = counties_data['geometry'].apply(
@@ -426,17 +425,26 @@ def population_by_climate_region(scenario):
         # Convert to GeoDataFrame for spatial operations
         counties_data = gpd.GeoDataFrame(counties_data)
 
+        # Convert to GeoDataFrame for spatial operations
+        gdf = gpd.GeoDataFrame(counties_data)
+
+        # Now simplify the geometry (this is a GeoSeries method)
+        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
+
+        # Convert to GeoJSON format for Plotly
+        counties_geojson = json.loads(gdf.to_json())
+
         # Extract the state FIPS from county FIPS (first 2 digits)
-        counties_data['county_fips'] = counties_data['county_fips'].astype(str)
-        counties_data['state_fips'] = counties_data['county_fips'].str[:2]
+        gdf['county_fips'] = gdf['county_fips'].astype(str)
+        gdf['state_fips'] = gdf['county_fips'].str[:2]
 
         # Check if CLIMATE_REGION exists in the dataframe
-        if 'climate_region' not in counties_data.columns:
+        if 'climate_region' not in gdf.columns:
             st.error("Climate region data not available")
             return None
 
         # For each state, determine the dominant climate region by most common value
-        state_climate_regions = counties_data.groupby('state_fips')['climate_region'].agg(
+        state_climate_regions = gdf.groupby('state_fips')['climate_region'].agg(
             lambda x: x.value_counts().index[0] if len(x) > 0 else None
         ).reset_index()
 
@@ -486,19 +494,19 @@ def population_by_climate_region(scenario):
 
         # Find the maximum absolute percentage change for symmetric color scale
         max_abs_pct_change = max(
-            abs(counties_data['variation_pct'].min()),
-            abs(counties_data['variation_pct'].max())
+            abs(gdf['variation_pct'].min()),
+            abs(gdf['variation_pct'].max())
         )
 
         # Create choropleth base layer with county population data
         fig = px.choropleth(
-            counties_data,
-            geojson=counties,
+            gdf,
+            geojson=counties_geojson,
             color='variation_pct',
             color_continuous_scale=DIVERGING_RGB,  # Red-Blue diverging scale
             range_color=[-max_abs_pct_change,
                          max_abs_pct_change],  # Symmetric scale
-            locations='county_fips',
+            locations=gdf.index,
             scope="usa",
             labels={
                 'county_name': 'County',
