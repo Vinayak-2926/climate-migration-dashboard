@@ -211,7 +211,6 @@ class DataDownloader:
                 download_variables=variables,
                 state=self.contiguous_states,
                 county="*",
-                with_geometry=("COUNTIES" in dataset),
                 api_key=CONFIG["US_CENSUS_API_KEY"],
             )
 

@@ -14,7 +14,6 @@ counties = ced.download(
     download_variables=["NAME"],
     state="*",
     county="*",
-    with_geometry=True,
 )
 
 # Format the county FIPS and Data Commons DCID
