@@ -108,7 +108,7 @@ class Database:
             self.conn.close()
             self.conn = None
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_population_projections_by_fips(_self, county_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
         """
         Get population projections for a specific county by FIPS code
@@ -143,7 +143,7 @@ class Database:
             st.error(f"Error loading population projections: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_population_timeseries(_self, county_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
         """
         Get population history for a specific county by FIPS code
@@ -178,7 +178,7 @@ class Database:
             st.error(f"Error loading historical population counts: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_timeseries_median_gross_rent(_self, county_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
         """
         Get time series data for median gross rent for the specified county by FIPS code
@@ -213,7 +213,7 @@ class Database:
             st.error(f"Error loading historical median gross rent: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=100)
     def get_stat_var(_self, table: Table, indicator_name: str, county_fips: str, year: Optional[int] = None) -> pd.DataFrame:
         """
         Get county data from a statistical variable's specified table
@@ -280,7 +280,7 @@ class Database:
             st.error(f"Error loading time series data: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=7200, max_entries=20)
     def get_county_metadata(_self, county_fips: Optional[Union[str, List[str]]] = None) -> pd.DataFrame:
         """
         Get county time series data from the specified table
@@ -328,7 +328,7 @@ class Database:
             st.error(f"Error loading county data counts: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=7200, max_entries=5)
     def get_cbsa_counties(_self, filter: Optional[str] = None) -> pd.DataFrame:
         """
         Get counties that belong to a metropolitan statistical area (MSA) along with their metadata
@@ -373,7 +373,7 @@ class Database:
             st.error(f"Error loading county CBSA data: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_projections_by_county(_self, county_fips: str) -> pd.DataFrame:
         """
         Get socioeconomic indices for a specific county by FIPS code
@@ -404,7 +404,7 @@ class Database:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_table_for_county(_self, table: Table, county_fips: str) -> pd.DataFrame:
         """
         Get socioeconomic indices for a specific county by FIPS code
@@ -435,7 +435,7 @@ class Database:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
             st.stop()
 
-    @st.cache_data
+    @st.cache_data(ttl=3600, max_entries=50)
     def get_index_projections(_self, county_fips: str, scenario: str):
         conn = _self.conn
         try:
@@ -460,7 +460,7 @@ class Database:
             st.error(f"Error loading socioeconomic indices: {str(e)}")
             st.stop()
             
-    @st.cache_data
+    @st.cache_data(ttl=7200, max_entries=5)
     def get_receiver_places(_self):
         try:
             df = pd.read_sql(f"SELECT * FROM {Table.RECEIVER_PLACES.value}", _self.engine)
@@ -469,7 +469,7 @@ class Database:
             st.error(f"Error loading receiver places: {str(e)}")
             st.stop()
             
-    @st.cache_data
+    @st.cache_data(ttl=7200, max_entries=5)
     def get_county_geometries(_self):
         try:
             query = text('SELECT "county_fips", "name", "geometry" FROM '
@@ -482,6 +482,7 @@ class Database:
             st.error(f"Error loading county geometries: {str(e)}")
             st.stop()
             
+    @st.cache_data(ttl=7200, max_entries=5)
     def get_state_geometries(_self):
         try:
             query = text('SELECT "STATE_FIPS", "NAME", "GEOMETRY" FROM '
@@ -499,9 +500,10 @@ db = Database()
 
 # For backwards compatibility
 
-
+@st.cache_resource
 def get_db_connection():
     """
     For backwards compatibility - returns the database connection
+    Cached as a resource to prevent multiple connection instances
     """
     return db.connect()
