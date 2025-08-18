@@ -153,7 +153,7 @@ def plot_climate_hazards(county_fips, county_name):
 
     st.plotly_chart(fig)
 
-
+@st.cache_data(max_entries=1)
 def plot_nri_choropleth():
     try:
         # Get county data
@@ -258,18 +258,18 @@ def plot_nri_choropleth():
             )
         )
 
-        event = st.plotly_chart(fig,
+        st.plotly_chart(fig,
                                 on_select="ignore",
                                 selection_mode=["points"],
                                 config=choropleth_config
                                 )
 
-        return event
     except Exception as e:
         st.error(f"Could not create map: {e}")
         print(f"Could not connect to url or create map.\n{e}")
         return None
     
+@st.cache_data(max_entries=1)
 def receiver_places_choropleth():
     try:
         # Get receiver places data
@@ -353,20 +353,18 @@ def receiver_places_choropleth():
         )
         
         # Display the chart
-        event = st.plotly_chart(fig,
+        st.plotly_chart(fig,
                                 on_select="ignore",
                                 selection_mode=["points"],
                                 config=choropleth_config
                                 )
-        
-        return event
         
     except Exception as e:
         st.error(f"Could not create receiver places map: {e}")
         print(f"Could not create receiver places map.\\n{e}")
         return None
     
-
+@st.cache_data(max_entries=1)
 def population_by_climate_region(scenario):
     """
     Display a choropleth map of population by county for a given scenario.
@@ -515,13 +513,11 @@ def population_by_climate_region(scenario):
         )
 
 
-        event = st.plotly_chart(
+        st.plotly_chart(
             fig,
             use_container_width=True,
             config=choropleth_config
         )
-
-        return event
     except Exception as e:
         st.error(f"Could not create map: {e}")
         print(f"Could not connect to url or create map.\n{e}")
