@@ -551,6 +551,9 @@ class DataCleaner:
             
         # Calculate z-scores
         merged_data_with_z_scores = cls.calculate_z_scores(merged_data)
+
+        # Convert all column names to lowercase
+        merged_data_with_z_scores.columns = merged_data_with_z_scores.columns.str.lower()
         
         # Save final output
         output_path = PATHS["processed"] / f"cleaned_{data_type}_data.csv"
@@ -610,7 +613,7 @@ class DataCleaner:
         if data_type == "education":
             processed_df["ELEMENTARY_SCHOOL_POPULATION"] = processed_df["MALE_5-9"] + processed_df["FEMALE_5-9"]  # Ages 5–9
             processed_df["MIDDLE_SCHOOL_POPULATION"] = processed_df["MALE_10-14"] + processed_df["FEMALE_10-14"]  # Ages 10–14
-            processed_df["HIGH_SCHOOL_POULATION"] = processed_df["MALE_15-17"] + processed_df["FEMALE_15-17"]  # Ages 15–17
+            processed_df["HIGH_SCHOOL_POPULATION"] = processed_df["MALE_15-17"] + processed_df["FEMALE_15-17"]  # Ages 15–17
 
         # Special processing for economic data
         if data_type == "economic":
@@ -645,10 +648,12 @@ class DataCleaner:
             
             # Create COUNTY_FIPS by combining STATE and COUNTY columns
             if "STATE" in df.columns and "COUNTY" in df.columns:
-                df["COUNTY_FIPS"] = (df["STATE"] + df["COUNTY"]).str.zfill(5)
+                df["county_fips"] = (df["STATE"] + df["COUNTY"]).str.zfill(5)
             
-            # Set COUNTY_FIPS as index
-            df = df.set_index("COUNTY_FIPS")
+            # Set county_fips as index
+            df = df.set_index("county_fips")
+
+            df.columns = df.columns.str.lower()
             
             # Save the processed file with the same name
             output_path = counties_output_dir / file.name

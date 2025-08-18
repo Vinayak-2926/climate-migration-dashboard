@@ -19,7 +19,10 @@ counties_2010 = ced.download(
     with_geometry=True,
 )
 counties_2010["COUNTY_FIPS"] = counties_2010["STATE"] + counties_2010["COUNTY"]
-counties_2010 = counties_2010.set_index("COUNTY_FIPS")
+counties_2010.columns = counties_2010.columns.str.lower()
+counties_2010 = counties_2010.set_index("county_fips")
+
+
 
 # Download 2020 county data
 counties_2020 = ced.download(
@@ -31,18 +34,13 @@ counties_2020 = ced.download(
     with_geometry=True,
 )
 counties_2020["COUNTY_FIPS"] = counties_2020["STATE"] + counties_2020["COUNTY"]
-counties_2020 = counties_2020.set_index("COUNTY_FIPS")
+counties_2020.columns = counties_2020.columns.str.lower()
+counties_2020 = counties_2020.set_index("county_fips")
 
 # Combine the datasets
 # Prioritize 2020 data for common FIPS, keep unique 2010 FIPS
 # Concatenate 2010 first, then 2020. Drop duplicates keeping the last (2020)
 combined_counties = pd.concat([counties_2010, counties_2020])
 counties = combined_counties[~combined_counties.index.duplicated(keep='last')]
-
-counties = counties.rename(
-    columns={
-        "geometry": "GEOMETRY",
-    }
-)
 
 counties.to_csv(DATA_DIR / "county.csv")

@@ -14,7 +14,6 @@ counties = ced.download(
     download_variables=["NAME"],
     state="*",
     county="*",
-    with_geometry=True,
 )
 
 # Format the county FIPS and Data Commons DCID
@@ -22,7 +21,8 @@ counties["COUNTY_FIPS"] = counties["STATE"] + counties["COUNTY"]
 counties["COUNTY_DCID"] = "geoId/" + counties["COUNTY_FIPS"]
 
 # Set index to the county FIPS
-counties = counties.set_index("COUNTY_FIPS")
+counties.columns = counties.columns.str.lower()
+counties = counties.set_index("county_fips")
 
 # Read historical population from locally stored Census data file (seemingly unavailable via API call)
 population_1900s = pd.read_csv(DATA_DIR / "raw/decennial_county_population_data_1900_1990.csv", dtype=str)
@@ -36,11 +36,11 @@ population_1900s = population_1900s.apply(pd.to_numeric, errors="coerce")
 counties = counties.merge(population_1900s, how="inner", left_index=True, right_index=True)
 
 # Query Data Commons for population data
-population_2000s = dcpd.build_time_series_dataframe(counties.COUNTY_DCID, "Count_Person")
+population_2000s = dcpd.build_time_series_dataframe(counties.county_dcid, "Count_Person")
 population_2000s = population_2000s[["2000", "2010", "2020"]]
 
 # Merge the 20th century data
-counties = counties.merge(population_2000s[["2000", "2010", "2020"]], how="inner", left_on="COUNTY_DCID", right_index=True)
+counties = counties.merge(population_2000s[["2000", "2010", "2020"]], how="inner", left_on="county_dcid", right_index=True)
 counties = counties.rename(columns=
     {
         "2000": "pop2000",
@@ -50,7 +50,7 @@ counties = counties.rename(columns=
 )
 
 # Name the index
-counties = counties.set_index(counties.index.set_names("COUNTY_FIPS"))
+counties = counties.set_index(counties.index.set_names("county_fips"))
 
 # Identify the population columns
 pop_columns = counties.columns[counties.columns.str.contains("pop")]
@@ -62,6 +62,8 @@ counties = counties.rename(columns={
     col: col[3:] for col in counties.columns 
     if col.startswith("pop") and col[3:].isdigit()
 })
+
+counties.columns = counties.columns.str.lower()
 
 # Export the population columns indexed by COUNTY_FIPS
 counties.to_csv(DATA_DIR / "processed/cleaned_data/timeseries_population.csv")
