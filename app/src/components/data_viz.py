@@ -2,7 +2,6 @@ import json
 import streamlit as st
 import pandas as pd
 import geopandas as gpd
-from shapely.ops import unary_union
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -370,8 +369,7 @@ def receiver_places_choropleth():
 
 def population_by_climate_region(scenario):
     """
-    Display a choropleth map of population by county for a given scenario, 
-    with climate regions highlighted.
+    Display a choropleth map of population by county for a given scenario.
 
     Parameters:
     -----------
@@ -386,16 +384,6 @@ def population_by_climate_region(scenario):
         The plotly chart event object
     """
     try:
-        state_geometries = database.get_state_geometries()
-        state_geometries['geometry'] = state_geometries['GEOMETRY'].apply(
-            lambda x: wkt.loads(x) if isinstance(x, str) else x)
-        state_geometries = gpd.GeoDataFrame(state_geometries)
-        
-        states_json = json.loads(state_geometries.to_json())
-
-        # Extract the features list directly
-        states_features = states_json
-
         # Get county data and merge with population projections
         counties_data = database.get_county_metadata()
         population_data = database.get_population_projections_by_fips()
@@ -438,60 +426,6 @@ def population_by_climate_region(scenario):
         gdf['county_fips'] = gdf['county_fips'].astype(str)
         gdf['state_fips'] = gdf['county_fips'].str[:2]
 
-        # Check if CLIMATE_REGION exists in the dataframe
-        if 'climate_region' not in gdf.columns:
-            st.error("Climate region data not available")
-            return None
-
-        # For each state, determine the dominant climate region by most common value
-        state_climate_regions = gdf.groupby('state_fips')['climate_region'].agg(
-            lambda x: x.value_counts().index[0] if len(x) > 0 else None
-        ).reset_index()
-
-        # Remove any rows where CLIMATE_REGION is None
-        state_climate_regions = state_climate_regions[state_climate_regions['climate_region'].notna(
-        )]
-
-        # Create a dictionary to map state FIPS to climate regions
-        state_region_dict = dict(zip(state_climate_regions['state_fips'],
-                                     state_climate_regions['climate_region']))
-
-        # Create a list to store modified features
-        modified_features = []
-
-        # Process each state feature
-        for feature in states_features['features']:
-            # Ensure the id is treated as a string
-            state_fips = feature['id']
-
-            # Only include states that have climate region data
-            if state_fips in state_region_dict:
-                # Add climate region to the feature properties
-                if 'properties' not in feature:
-                    feature['properties'] = {}
-
-                feature['properties']['climate_region'] = state_region_dict[state_fips]
-                modified_features.append(feature)
-
-        # Create a GeoDataFrame from the modified features
-        states_gdf = gpd.GeoDataFrame.from_features(modified_features)
-
-        # Ensure 'id' column is treated as string if it exists in the GeoDataFrame
-        if 'id' in states_gdf.columns:
-            states_gdf['id'] = states_gdf['id'].astype(str)
-
-        # Dissolve states by climate region
-        climate_regions_gdf = states_gdf.dissolve(by='climate_region')
-
-        # Clean up geometries to remove internal boundaries
-        for idx, row in climate_regions_gdf.iterrows():
-            if row.geometry.geom_type == 'MultiPolygon':
-                cleaned_geom = unary_union(row.geometry)
-                climate_regions_gdf.at[idx, 'geometry'] = cleaned_geom
-
-        # Convert to GeoJSON format for Plotly
-        climate_regions_geojson = json.loads(climate_regions_gdf.to_json())
-
         # Find the maximum absolute percentage change for symmetric color scale
         max_abs_pct_change = max(
             abs(gdf['variation_pct'].min()),
@@ -510,47 +444,29 @@ def population_by_climate_region(scenario):
             scope="usa",
             labels={
                 'county_name': 'County',
-                'climate_region': 'Climate Region',
                 scenario: 'Population (2065)',
                 'variation_pct': 'Population Change (%)'
             },
             basemap_visible=False,
             hover_data={
                 'county_name': True,
-                'climate_region': True,
                 scenario: True,
                 'variation_pct': ':.2f',
                 'county_fips': False  # Hide FIPS code from hover
             },
-            custom_data=['county_name', 'climate_region',
-                         scenario, 'variation_pct']
+            custom_data=['county_name', scenario, 'variation_pct']
         )
 
         # Update hover template to format the display nicely
         fig.update_traces(
             hovertemplate='<b>%{customdata[0]}</b><br>' +
-            'Climate Region: %{customdata[1]}<br>' +
-            'Population (2065): %{customdata[2]:,.0f}<br>' +
-            'Change from Baseline: %{customdata[3]:.2f}%<br>' +
-            '<extra></extra>'  # Removes trace name from hover
+            'Population (2065): %{customdata[1]:,.0f}<br>' +
+            'Change from Baseline: %{customdata[2]:.2f}%<br>' +
+            '<extra></extra>',  # Removes trace name from hover
+            marker_line_width=0
+
         )
 
-        # Add climate regions overlay with white borders
-        fig.add_trace(
-            go.Choropleth(
-                geojson=climate_regions_geojson,
-                locations=climate_regions_gdf.index.tolist(),
-                z=[1] * len(climate_regions_gdf),  # Dummy values for coloring
-                # Transparent fill
-                colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']],
-                marker_line_color='white',  # Border color for regions
-                marker_line_width=5,        # Thicker border for visibility
-                showscale=False,            # Hide the colorbar for this layer
-                name="Climate Regions",
-                showlegend=False,
-                hoverinfo='skip'
-            )
-        )
 
         # Configure the map layout
         fig.update_geos(
@@ -598,27 +514,6 @@ def population_by_climate_region(scenario):
             autosize=True,
         )
 
-        # Display annotations for climate regions
-        for region, row in climate_regions_gdf.iterrows():
-            # Get centroid of the region for label placement
-            centroid = row.geometry.centroid
-
-            fig.add_annotation(
-                x=centroid.x,
-                y=centroid.y,
-                text=region,
-                showarrow=False,
-                font=dict(
-                    family="Arial",
-                    size=16,
-                    color="black"
-                ),
-                bgcolor="white",
-                bordercolor="black",
-                borderwidth=1,
-                borderpad=4,
-                opacity=0.8
-            )
 
         event = st.plotly_chart(
             fig,
