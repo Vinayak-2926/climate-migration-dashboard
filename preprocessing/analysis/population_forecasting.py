@@ -40,8 +40,6 @@ def main():
             "B01003_001E": "POPULATION_2010",
         },
     )
-    
-    us_county_data = us_county_data.drop("geometry", axis=1)
 
     # Create full FIPS code
     us_county_data["COUNTY_FIPS"] = (

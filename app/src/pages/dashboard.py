@@ -25,7 +25,7 @@ st.html(
 )
 
 cmpt.quote_box("Climate change is already profoundly reshaping where Americans reside and where continued habitation is no longer viable. The increasing frequency of wildfires, floods, extreme heat waves, and rising sea levels has already displaced over 3.2 million people in the United States between 2000 and 2020 alone. Projections indicate that by 2070, sea level rise could disrupt the lives of an additional 13 million individuals.")
-cmpt.vertical_spacer(10)
+cmpt.vertical_spacer(2)
 
 counties = database.get_cbsa_counties(filter="metro").set_index('county_fips')
 
@@ -83,7 +83,7 @@ cmpt.plot_nri_choropleth()
 
 cmpt.quote_box("""Climate change will undoubtedly impact the lives of all Americans, but as the map above shows, the hazards and risks associated with a changing climate vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods.""")
 
-cmpt.vertical_spacer(5)
+cmpt.vertical_spacer(2)
 
 cmpt.receiver_places_choropleth()
 
@@ -112,7 +112,7 @@ cmpt.feature_cards(
 with st.expander("Read more about migration factors", icon=":material/article:"):
     st.markdown("""When regions experiencing population loss due to climate concerns face labor shortages, wages tend to rise, creating an economic incentive for some people to stay or even move into these areas despite climate risks. Housing prices also adjust, becoming more affordable in areas experiencing outmigration, which further complicates migration patterns. This economic "dampening effect" means that even highly climate-vulnerable counties won't see mass exoduses, as financial considerations, family ties, and community connections often outweigh climate concerns in people's decision-making process. Migration is ultimately a complex interplay of climate, economic, social, and personal factors rather than a simple response to climate vulnerability alone. The key migration decision factors included in this model are:""")
 
-cmpt.vertical_spacer(5)
+cmpt.vertical_spacer(2)
 
 # Get the County FIPS code, which will be used for all future queries
 if selected_county_fips:
@@ -137,7 +137,7 @@ if selected_county_fips:
     
 
     # Current County Performance Analysis
-    cmpt.vertical_spacer(20)
+    cmpt.vertical_spacer(2)
     
     st.markdown("""
         # Current County Performance
@@ -152,19 +152,19 @@ if selected_county_fips:
     cmpt.display_housing_indicators(
         county_name, state_name, selected_county_fips)
 
-    cmpt.vertical_spacer(5)
+    cmpt.vertical_spacer(2)
 
     cmpt.display_economic_indicators(
         county_name, state_name, selected_county_fips)
 
-    cmpt.vertical_spacer(5)
+    cmpt.vertical_spacer(2)
 
     cmpt.display_education_indicators(
         county_name, state_name, selected_county_fips)
 
     # Climate Impact Analysis
     # st.header("Climate Impact Analysis")
-    cmpt.vertical_spacer(20)
+    cmpt.vertical_spacer(2)
     st.markdown("""
         # Climate Migration Impacts
         """)
@@ -177,5 +177,5 @@ if selected_county_fips:
         county_name, state_name, projected_data)
 
     # Display policy recommendations
-    cmpt.vertical_spacer(10)
+    cmpt.vertical_spacer(2)
     cmpt.generate_policy_recommendations(projected_data)
