@@ -31,6 +31,7 @@ __all__ = [
     "plot_nri_score",
     "plot_climate_hazards",
     "receiver_places_choropleth",
+    "receiver_places_choropleth_mpl",
     "plot_socioeconomic_indices",
     "plot_socioeconomic_radar",
     "population_by_climate_region",
@@ -71,6 +72,13 @@ RISK_LEVELS = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 # Map risk categories to colors
 RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, DIVERGING_RGB))
 RISK_COLOR_MAPPING_HEX = dict(zip(RISK_LEVELS, DIVERGING_HEX))
+
+# Receiver places color mappings
+RECEIVER_COLOR_MAPPING_HEX = {
+    "No": "#E6E6E6",  # rgb(230, 230, 230)
+    "Maybe": "#86D2DE",  # DIVERGING_HEX[1]
+    "Yes": "#00C4DA"  # DIVERGING_HEX[0]
+}
 
 choropleth_config = {
     'displayModeBar': False,
@@ -451,6 +459,105 @@ def receiver_places_choropleth():
                                 selection_mode=["points"],
                                 config=choropleth_config
                                 )
+        
+    except Exception as e:
+        st.error(f"Could not create receiver places map: {e}")
+        print(f"Could not create receiver places map.\\n{e}")
+        return None
+
+def receiver_places_choropleth_mpl():
+    """
+    Matplotlib version of receiver_places_choropleth.
+    """
+    try:
+        receiver_places_data = database.get_receiver_places()
+        
+        county_data: gpd.GeoDataFrame = database.get_county_geometries()
+        
+        county_data = county_data.merge(receiver_places_data, on='county_fips', how='left')
+        
+        fig, ax = plt.subplots(
+            1, 1, 
+            figsize=(20, 12),
+            dpi=300,
+            facecolor='white'
+        )
+        
+        # Get unique categories in sorted order (matplotlib sorts them alphabetically)
+        unique_categories = sorted(county_data['is_receiving_county'].dropna().unique())
+        
+        county_data.plot(
+            column='is_receiving_county',
+            categorical=True,
+            legend=False,
+            cmap=mcolors.ListedColormap([RECEIVER_COLOR_MAPPING_HEX[cat] for cat in unique_categories]),
+            edgecolor='white',
+            linewidth=0.1,
+            alpha=1.0,
+            rasterized=False,
+            ax=ax
+        )
+        
+        ax.set_xlim(-125, -66)
+        ax.set_ylim(20, 50)
+        ax.set_aspect('equal')
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        
+        title = ax.set_title(
+            "PLACE Initiative - Receiver Places",
+            fontsize=20,
+            fontweight='bold',
+            pad=25,
+            fontfamily='sans-serif'
+        )
+        title.set_antialiased(True)
+        
+        legend_elements = []
+        for label, color in RECEIVER_COLOR_MAPPING_HEX.items():
+            legend_elements.append(
+                Patch(
+                    facecolor=color, 
+                    label=label,
+                )
+            )
+        
+        legend = ax.legend(
+            handles=legend_elements,
+            title='County is a receiver place?',
+            loc='center left',
+            bbox_to_anchor=(1.02, 0.5),
+            frameon=True,
+            fancybox=True,
+            fontsize=12,
+            title_fontsize=14,
+            facecolor='white',
+            framealpha=0.95
+        )
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_fontfamily('sans-serif')
+        
+        for text in legend.get_texts():
+            text.set_antialiased(True)
+        
+        plt.tight_layout(
+            pad=2.0,
+            rect=[0, 0, 0.85, 1]
+        )
+        
+        st.pyplot(
+            fig, 
+            dpi=150,
+            bbox_inches='tight',
+            facecolor='white',
+            clear_figure=False
+        )
+        
+        plt.close(fig)
         
     except Exception as e:
         st.error(f"Could not create receiver places map: {e}")

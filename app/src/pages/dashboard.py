@@ -85,7 +85,7 @@ cmpt.quote_box("""Climate change will undoubtedly impact the lives of all Americ
 
 cmpt.vertical_spacer(2)
 
-cmpt.receiver_places_choropleth()
+cmpt.receiver_places_choropleth_mpl()
 
 st.markdown("""
             ### Climate Vulnerability Isn't the Whole Story
