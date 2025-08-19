@@ -157,44 +157,30 @@ def plot_climate_hazards(county_fips, county_name):
 def plot_nri_choropleth():
     try:
         # Get county data
-        county_data = database.get_county_geometries()
+        county_data: gpd.GeoDataFrame = database.get_county_geometries()
         
         # Get FEMA risk data
         fema_data = database.get_stat_var(Table.COUNTY_FEMA_DATA, "fema_nri",
                                         county_fips=county_data['county_fips'].tolist(), year=2023).reset_index()
         
-        # Merge the basic county data with the FEMA NRI data
-        merged_df = pd.merge(fema_data, county_data, on='county_fips', how='left')
-
-        # Convert WKT to geometry objects with error handling
-        merged_df['geometry'] = merged_df['geometry'].apply(
-            lambda x: wkt.loads(x) if isinstance(x, str) else x)
+        county_data = county_data.merge(fema_data, on='county_fips', how='left')
 
         # Create NRI risk buckets
-        merged_df['nri_bucket'] = pd.cut(
-            merged_df['fema_nri'],
+        county_data['nri_bucket'] = pd.cut(
+            county_data['fema_nri'],
             bins=[0, 20, 40, 60, 80, 100],
             include_lowest=True,
             labels=RISK_LEVELS,
             ordered=True
         )
-        
-        # Create GeoDataFrame first (needed for proper GeoSeries)
-        gdf = gpd.GeoDataFrame(merged_df)
-
-        # Now simplify the geometry (this is a GeoSeries method)
-        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
-
-        # Convert to GeoJSON format for Plotly
-        geojson_data = json.loads(gdf.to_json())
 
         # Create choropleth base layer with county boundaries
         fig = px.choropleth(
-            gdf,
-            geojson=geojson_data,
+            county_data,
+            geojson=county_data.geometry,
             color='nri_bucket',
             color_discrete_map=RISK_COLOR_MAPPING,
-            locations=gdf.index,
+            locations=county_data.index,
             scope="usa",
             basemap_visible=True,
             custom_data=['name', 'fema_nri'],
@@ -275,22 +261,9 @@ def receiver_places_choropleth():
         # Get receiver places data
         receiver_places_data = database.get_receiver_places()
         
-        county_data = database.get_county_geometries()
+        county_data: gpd.GeoDataFrame = database.get_county_geometries()
         
-        merged_df = pd.merge(receiver_places_data, county_data, on='county_fips', how='left')
-
-        # Convert WKT to geometry objects with error handling
-        merged_df['geometry'] = merged_df['geometry'].apply(
-            lambda x: wkt.loads(x) if isinstance(x, str) else x)
-
-        # Create GeoDataFrame first (needed for proper GeoSeries)
-        gdf = gpd.GeoDataFrame(merged_df)
-
-        # Now simplify the geometry (this is a GeoSeries method)
-        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
-
-        # Convert to GeoJSON format for Plotly
-        geojson_data = json.loads(gdf.to_json())
+        county_data = county_data.merge(receiver_places_data, on='county_fips', how='left')
         
         # Define discrete color mapping for is_receiving_county
         color_discrete_map = {
@@ -301,11 +274,11 @@ def receiver_places_choropleth():
         
         # Create choropleth map using discrete colors
         fig = px.choropleth(
-            gdf,
-            geojson=geojson_data,
+            county_data,
+            geojson=county_data.geometry,
             color='is_receiving_county',
             color_discrete_map=color_discrete_map,
-            locations=merged_df.index,
+            locations=county_data.index,
             scope="usa",
             labels={
                 'is_receiving_county': 'Receiving County'
@@ -383,62 +356,56 @@ def population_by_climate_region(scenario):
     """
     try:
         # Get county data and merge with population projections
-        counties_data = database.get_county_metadata()
+        county_data = database.get_county_geometries()
         population_data = database.get_population_projections_by_fips()
-        counties_data = counties_data.merge(
+        county_data = county_data.merge(
             population_data,
             how='inner',
             on='county_fips'
         )
 
-        # Convert WKT to geometry objects
-        counties_data['geometry'] = counties_data['geometry'].apply(wkt.loads)
-
         # Get centroids of geometries for marker placement
-        counties_data['centroid_lon'] = counties_data['geometry'].apply(
+        county_data['centroid_lon'] = county_data['geometry'].apply(
             lambda geom: geom.centroid.x)
-        counties_data['centroid_lat'] = counties_data['geometry'].apply(
+        county_data['centroid_lat'] = county_data['geometry'].apply(
             lambda geom: geom.centroid.y)
 
         # Calculate variation between scenario and baseline
-        counties_data['variation'] = counties_data[scenario] - \
-            counties_data['population_2065_s3']
+        county_data['variation'] = county_data[scenario] - \
+            county_data['population_2065_s3']
 
         # Percentage difference
-        counties_data['variation_pct'] = ((counties_data[scenario] - counties_data['population_2065_s3']) /
-                                          counties_data['population_2065_s3']) * 100
+        county_data['variation_pct'] = ((county_data[scenario] - county_data['population_2065_s3']) /
+                                          county_data['population_2065_s3']) * 100
 
         # Convert to GeoDataFrame for spatial operations
-        counties_data = gpd.GeoDataFrame(counties_data)
-
-        # Convert to GeoDataFrame for spatial operations
-        gdf = gpd.GeoDataFrame(counties_data)
+        # county_data = gpd.GeoDataFrame(county_data)
 
         # Now simplify the geometry (this is a GeoSeries method)
-        gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.001)
+        # county_data['geometry'] = county_data['geometry'].simplify(tolerance=0.001)
 
         # Convert to GeoJSON format for Plotly
-        counties_geojson = json.loads(gdf.to_json())
+        # counties_geojson = json.loads(county_data.to_json())
 
         # Extract the state FIPS from county FIPS (first 2 digits)
-        gdf['county_fips'] = gdf['county_fips'].astype(str)
-        gdf['state_fips'] = gdf['county_fips'].str[:2]
+        county_data['county_fips'] = county_data['county_fips'].astype(str)
+        county_data['state_fips'] = county_data['county_fips'].str[:2]
 
         # Find the maximum absolute percentage change for symmetric color scale
         max_abs_pct_change = max(
-            abs(gdf['variation_pct'].min()),
-            abs(gdf['variation_pct'].max())
+            abs(county_data['variation_pct'].min()),
+            abs(county_data['variation_pct'].max())
         )
 
         # Create choropleth base layer with county population data
         fig = px.choropleth(
-            gdf,
-            geojson=counties_geojson,
+            county_data,
+            geojson=county_data.geometry,
             color='variation_pct',
             color_continuous_scale=DIVERGING_RGB,  # Red-Blue diverging scale
             range_color=[-max_abs_pct_change,
                          max_abs_pct_change],  # Symmetric scale
-            locations=gdf.index,
+            locations=county_data.index,
             scope="usa",
             labels={
                 'county_name': 'County',

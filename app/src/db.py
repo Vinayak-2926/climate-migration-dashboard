@@ -1,11 +1,13 @@
 import os
 import streamlit as st
 import pandas as pd
+import geopandas as gpd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 from enum import Enum
 from typing import Optional, List, Union
 from urllib.parse import urlparse
+from shapely import wkt
 
 
 class Table(Enum):
@@ -476,8 +478,14 @@ class Database:
                          f'{Table.COUNTY_METADATA.value}')
             
             df = pd.read_sql(query, _self.engine)
+            
+            # Convert WKT to geometry objects with error handling
+            df['geometry'] = df['geometry'].apply(
+                lambda x: wkt.loads(x) if isinstance(x, str) else x)
+            
+            gdf = gpd.GeoDataFrame(df, geometry='geometry')
 
-            return df
+            return gdf
         except Exception as e:
             st.error(f"Error loading county geometries: {str(e)}")
             st.stop()
@@ -490,7 +498,13 @@ class Database:
             
             df = pd.read_sql(query, _self.engine)
 
-            return df
+            # Convert WKT to geometry objects with error handling
+            df['GEOMETRY'] = df['GEOMETRY'].apply(
+                lambda x: wkt.loads(x) if isinstance(x, str) else x)
+            
+            gdf = gpd.GeoDataFrame(df, geometry='GEOMETRY')
+
+            return gdf
         except Exception as e:
             st.error(f"Error loading state geometries: {str(e)}")
             st.stop()
