@@ -5,6 +5,9 @@ import geopandas as gpd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.patches import Patch
 from src.components.utils import *
 
 from src.db import db as database, Table
@@ -24,6 +27,7 @@ __all__ = [
     "display_county_indicators",
     "feature_cards",
     "plot_nri_choropleth",
+    "plot_nri_choropleth_mpl",
     "plot_nri_score",
     "plot_climate_hazards",
     "receiver_places_choropleth",
@@ -52,11 +56,21 @@ MONOCHROME_RGB = [
     "rgb(178, 255, 246)",
 ]
 
+# Convert RGB colors to hex format for matplotlib
+DIVERGING_HEX = [
+    "#00C4DA",  # rgb(0, 196, 218)
+    "#86D2DE",  # rgb(134, 210, 222)
+    "#E7D6BD",  # rgb(231, 214, 189)
+    "#D66767",  # rgb(214, 103, 103)
+    "#D13734",  # rgb(209, 55, 52)
+]
+
 # Risk level labels
 RISK_LEVELS = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 
 # Map risk categories to colors
 RISK_COLOR_MAPPING = dict(zip(RISK_LEVELS, DIVERGING_RGB))
+RISK_COLOR_MAPPING_HEX = dict(zip(RISK_LEVELS, DIVERGING_HEX))
 
 choropleth_config = {
     'displayModeBar': False,
@@ -249,6 +263,112 @@ def plot_nri_choropleth():
                                 selection_mode=["points"],
                                 config=choropleth_config
                                 )
+
+    except Exception as e:
+        st.error(f"Could not create map: {e}")
+        print(f"Could not connect to url or create map.\n{e}")
+        return None
+
+# @st.cache_data(max_entries=1)
+def plot_nri_choropleth_mpl():
+    """
+    Matplotlib version of plot_nri_choropleth.
+    """
+    try:
+        county_data: gpd.GeoDataFrame = database.get_county_geometries()
+        
+        fema_data = database.get_stat_var(Table.COUNTY_FEMA_DATA, "fema_nri",
+                                        county_fips=county_data['county_fips'].tolist(), year=2023).reset_index()
+        
+        county_data = county_data.merge(fema_data, on='county_fips', how='left')
+
+        county_data['nri_bucket'] = pd.cut(
+            county_data['fema_nri'],
+            bins=[0, 20, 40, 60, 80, 100],
+            include_lowest=True,
+            labels=RISK_LEVELS,
+            ordered=True
+        )
+
+        fig, ax = plt.subplots(
+            1, 1, 
+            figsize=(20, 12),
+            dpi=300,
+            facecolor='white'
+        )
+        
+        county_data.plot(
+            column='nri_bucket',
+            categorical=True,
+            legend=False,
+            cmap=mcolors.ListedColormap(DIVERGING_HEX),
+            edgecolor='white',
+            linewidth=0.1,
+            alpha=1.0,
+            rasterized=False,
+            ax=ax
+        )
+        
+        ax.set_xlim(-125, -66)
+        ax.set_ylim(20, 50)
+        ax.set_aspect('equal')
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        
+        title = ax.set_title(
+            "National Risk Index Across US Counties",
+            fontsize=20,
+            fontweight='bold',
+            pad=25,
+            fontfamily='sans-serif'
+        )
+        title.set_antialiased(True)
+        
+        legend_elements = []
+        for label, color in RISK_COLOR_MAPPING_HEX.items():
+            legend_elements.append(
+                Patch(
+                    facecolor=color, 
+                    label=label,
+                )
+            )
+        
+        legend = ax.legend(
+            handles=legend_elements,
+            title='FEMA Risk Index Level',
+            loc='center left',
+            bbox_to_anchor=(1.02, 0.5),
+            frameon=True,
+            fancybox=True,
+            fontsize=12,
+            title_fontsize=14,
+            facecolor='white',
+            framealpha=0.95
+        )
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_fontfamily('sans-serif')
+        
+        for text in legend.get_texts():
+            text.set_antialiased(True)
+        
+        plt.tight_layout(
+            pad=2.0,
+            rect=[0, 0, 0.85, 1]
+        )
+        
+        st.pyplot(
+            fig, 
+            dpi=150,
+            bbox_inches='tight',
+            facecolor='white',
+            clear_figure=False
+        )
+        
+        plt.close(fig)
 
     except Exception as e:
         st.error(f"Could not create map: {e}")

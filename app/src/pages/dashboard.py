@@ -79,7 +79,7 @@ with st.sidebar:
     cmpt.plot_nri_score(selected_county_fips)
 
 # Climate migration choropleth of US counties
-cmpt.plot_nri_choropleth()
+cmpt.plot_nri_choropleth_mpl()
 
 cmpt.quote_box("""Climate change will undoubtedly impact the lives of all Americans, but as the map above shows, the hazards and risks associated with a changing climate vary across U.S. regions. Counties with limited exposure and/or high adaptability to those hazards are expected to attract climate migrants. These "receiver places" tend to be inland and north of the Sun Belt, often former industrial cities with underused infrastructure and walkable, mixed-use neighborhoods.""")
 
