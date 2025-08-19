@@ -35,6 +35,7 @@ __all__ = [
     "plot_socioeconomic_indices",
     "plot_socioeconomic_radar",
     "population_by_climate_region",
+    "population_by_climate_region_mpl",
     "socioeconomic_projections",
     "display_housing_burden_plot",
     "display_housing_vacancy_plot"
@@ -712,6 +713,157 @@ def population_by_climate_region(scenario):
             use_container_width=True,
             config=choropleth_config
         )
+    except Exception as e:
+        st.error(f"Could not create map: {e}")
+        print(f"Could not connect to url or create map.\n{e}")
+        return None
+
+
+# @st.cache_data(max_entries=1)
+def population_by_climate_region_mpl(scenario):
+    """
+    Matplotlib version of population_by_climate_region.
+    Display a choropleth map of population by county for a given scenario.
+
+    Parameters:
+    -----------
+    scenario : str
+        The column name for the population scenario to display (e.g., 'population_2065_s5a')
+
+    Returns:
+    --------
+    None
+        Displays the matplotlib figure using st.pyplot
+    """
+    try:
+        # Get county data and merge with population projections
+        county_data = database.get_county_geometries()
+        population_data = database.get_population_projections_by_fips()
+        county_data = county_data.merge(
+            population_data,
+            how='inner',
+            on='county_fips'
+        )
+
+        # Calculate variation between scenario and baseline
+        county_data['variation'] = county_data[scenario] - \
+            county_data['population_2065_s3']
+
+        # Percentage difference
+        county_data['variation_pct'] = ((county_data[scenario] - county_data['population_2065_s3']) /
+                                          county_data['population_2065_s3']) * 100
+
+        # Find the maximum absolute percentage change for symmetric color scale
+        max_abs_pct_change = max(
+            abs(county_data['variation_pct'].min()),
+            abs(county_data['variation_pct'].max())
+        )
+
+        # Create the matplotlib figure
+        fig, ax = plt.subplots(
+            1, 1, 
+            figsize=(20, 12),
+            dpi=300,
+            facecolor='white'
+        )
+        
+        # Create a diverging colormap for population changes
+        # Use a symmetric range around zero
+        vmin = -max_abs_pct_change
+        vmax = max_abs_pct_change
+        
+        # Create a diverging colormap using the existing DIVERGING_HEX colors
+        # Reversed order so higher population increases = darker/more intense colors (greater stress)
+        from matplotlib.colors import LinearSegmentedColormap
+        colors_for_cmap = [DIVERGING_HEX[0], DIVERGING_HEX[1], DIVERGING_HEX[2], DIVERGING_HEX[3], DIVERGING_HEX[4]]
+        n_bins = 100  # Fine-grained colormap
+        cmap = LinearSegmentedColormap.from_list('population_change', colors_for_cmap, N=n_bins)
+        
+        # Plot the choropleth
+        county_data.plot(
+            column='variation_pct',
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            legend=False,
+            edgecolor='white',
+            linewidth=0.1,
+            alpha=1.0,
+            rasterized=False,
+            ax=ax
+        )
+        
+        # Set map bounds to focus on continental US
+        ax.set_xlim(-125, -66)
+        ax.set_ylim(20, 50)
+        ax.set_aspect('equal')
+        
+        # Remove axes and spines
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        
+        # Impact labels based on the human-readable scenario parameter
+        scenario_labels = {
+            'population_2065_s5a': 'Low Impact Climate Migration',
+            'population_2065_s5b': 'Medium Impact Climate Migration',
+            'population_2065_s5c': 'High Impact Climate Migration'
+        }
+
+        scenario_title = scenario_labels.get(scenario, scenario)
+        
+        # Set title
+        title = ax.set_title(
+            f"Effect of Climate Migration on 2065 Population Projections\n{scenario_title}",
+            fontsize=20,
+            fontweight='bold',
+            pad=25,
+            fontfamily='sans-serif'
+        )
+        title.set_antialiased(True)
+        
+        # Add colorbar
+        from matplotlib import cm
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
+        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        
+        cbar = plt.colorbar(
+            sm,
+            ax=ax,
+            shrink=0.5,
+            aspect=30,
+            pad=0.02,
+            orientation='vertical'
+        )
+        cbar.set_label(
+            'Population Change (%)',
+            rotation=270,
+            labelpad=20,
+            fontsize=14,
+            fontweight='bold'
+        )
+        cbar.ax.tick_params(labelsize=12)
+        
+        # Set tight layout
+        plt.tight_layout(
+            pad=2.0,
+            rect=[0, 0, 0.95, 1]
+        )
+        
+        # Display using streamlit
+        st.pyplot(
+            fig, 
+            dpi=150,
+            bbox_inches='tight',
+            facecolor='white',
+            clear_figure=False
+        )
+        
+        plt.close(fig)
+
     except Exception as e:
         st.error(f"Could not create map: {e}")
         print(f"Could not connect to url or create map.\n{e}")

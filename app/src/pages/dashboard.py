@@ -126,7 +126,7 @@ else:
 
 if selected_county_fips:
 
-    cmpt.population_by_climate_region(selected_scenario)
+    cmpt.population_by_climate_region_mpl(selected_scenario)
 
     st.markdown("""
                 These projections help visualize how climate change could reshape population distribution across regions, with some areas experiencing population growth (Northeast, West, California) and others facing decline (South, Midwest) due to climate-related migration pressures.
